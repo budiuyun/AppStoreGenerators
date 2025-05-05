@@ -88,11 +88,10 @@
                     </div>
                     <div class="form-group">
                         <label for="pullPolicy">镜像拉取策略 *</label>
-                        <select id="pullPolicy" required>
-                            <option value="IfNotPresent">IfNotPresent (推荐)</option>
-                            <option value="Always">Always</option>
-                            <option value="Never">Never</option>
+                        <select id="pullPolicy" required disabled>
+                            <option value="IfNotPresent" selected>IfNotPresent (推荐)</option>
                         </select>
+                        <p class="info">出于安全和性能考虑，镜像拉取策略固定为IfNotPresent</p>
                     </div>
                 </div>
 
@@ -101,15 +100,23 @@
                     <h2>服务配置</h2>
                     <div class="form-group">
                         <label for="serviceType">服务类型 *</label>
-                        <select id="serviceType" required>
-                            <option value="ClusterIP">ClusterIP (推荐)</option>
-                            <option value="NodePort">NodePort</option>
-                            <option value="LoadBalancer">LoadBalancer</option>
+                        <select id="serviceType" required disabled>
+                            <option value="ClusterIP" selected>ClusterIP</option>
                         </select>
+                        <p class="info">服务类型固定为ClusterIP</p>
                     </div>
-                    <div class="form-group">
-                        <label for="servicePort">服务端口 *</label>
-                        <input type="number" id="servicePort" min="1" max="65535" value="80" required>
+                    
+                    <div class="port-section">
+                        <h3>服务端口配置</h3>
+                        <p class="info">可以添加多个端口，每个端口需要指定名称和端口号</p>
+                        <div id="port-container">
+                            <div class="port-row">
+                                <input type="text" class="port-name" placeholder="端口名称" value="http">
+                                <input type="number" class="port-number" placeholder="端口号" value="80" min="1" max="65535">
+                                <button type="button" class="remove-port">删除</button>
+                            </div>
+                        </div>
+                        <button type="button" id="add-port">添加端口</button>
                     </div>
                 </div>
 
@@ -119,18 +126,17 @@
                     
                     <div class="section">
                         <h3>网络带宽限制</h3>
-                        <div class="form-group">
-                            <label for="networkEnabled">启用网络带宽限制</label>
-                            <input type="checkbox" id="networkEnabled" checked>
-                        </div>
+                        <p class="info">网络带宽限制必须启用</p>
                         <div class="network-settings">
                             <div class="form-group">
                                 <label for="egress">出站带宽限制</label>
                                 <input type="text" id="egress" placeholder="例如：1M" value="1M">
+                                <p class="field-desc">格式为数字+单位(K,M,G)</p>
                             </div>
                             <div class="form-group">
                                 <label for="ingress">入站带宽限制</label>
                                 <input type="text" id="ingress" placeholder="例如：1M" value="1M">
+                                <p class="field-desc">格式为数字+单位(K,M,G)</p>
                             </div>
                         </div>
                     </div>
@@ -140,18 +146,22 @@
                         <div class="form-group">
                             <label for="limitsCpu">CPU限制</label>
                             <input type="text" id="limitsCpu" placeholder="例如：200m" value="200m">
+                            <p class="field-desc">可以是m(千分之一核)或直接的核心数</p>
                         </div>
                         <div class="form-group">
                             <label for="limitsMemory">内存限制</label>
                             <input type="text" id="limitsMemory" placeholder="例如：256Mi" value="256Mi">
+                            <p class="field-desc">可以是Mi(兆字节)或Gi(吉字节)</p>
                         </div>
                         <div class="form-group">
                             <label for="requestsCpu">CPU请求</label>
                             <input type="text" id="requestsCpu" placeholder="例如：100m" value="100m">
+                            <p class="field-desc">可以是m(千分之一核)或直接的核心数</p>
                         </div>
                         <div class="form-group">
                             <label for="requestsMemory">内存请求</label>
                             <input type="text" id="requestsMemory" placeholder="例如：128Mi" value="128Mi">
+                            <p class="field-desc">可以是Mi(兆字节)或Gi(吉字节)</p>
                         </div>
                     </div>
                     
@@ -177,6 +187,7 @@
                             <div class="form-group">
                                 <label for="size">存储大小</label>
                                 <input type="text" id="size" placeholder="例如：1Gi" value="1Gi">
+                                <p class="field-desc">格式为数字+单位(Mi,Gi,Ti)</p>
                             </div>
                             <div class="form-group">
                                 <label for="storageClass">存储类名称</label>
@@ -196,6 +207,8 @@
                         <div class="env-row">
                             <input type="text" class="env-name" placeholder="环境变量名称" value="APP_MODE">
                             <input type="text" class="env-value" placeholder="环境变量值" value="production">
+                            <input type="text" class="env-title" placeholder="变量中文名称" value="运行模式">
+                            <input type="text" class="env-desc" placeholder="变量描述" value="应用程序运行模式">
                             <button type="button" class="remove-env">删除</button>
                         </div>
                     </div>
@@ -210,6 +223,7 @@
                     <div class="preview-tabs">
                         <button class="preview-tab active" data-preview="chart">Chart.yaml</button>
                         <button class="preview-tab" data-preview="values">values.yaml</button>
+                        <button class="preview-tab" data-preview="schema">values.schema.json</button>
                         <button class="preview-tab" data-preview="deployment">deployment.yaml</button>
                         <button class="preview-tab" data-preview="service">service.yaml</button>
                         <button class="preview-tab" data-preview="pvc">pvc.yaml</button>
@@ -219,6 +233,7 @@
                     <div class="preview-content">
                         <pre id="preview-chart" class="active"></pre>
                         <pre id="preview-values"></pre>
+                        <pre id="preview-schema"></pre>
                         <pre id="preview-deployment"></pre>
                         <pre id="preview-service"></pre>
                         <pre id="preview-pvc"></pre>
