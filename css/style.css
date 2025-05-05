@@ -1,0 +1,118 @@
+/* 全局样式 */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background-color: var(--body-color);
+    color: var(--text-color);
+    transition: background-color 0.3s, color 0.3s;
+}
+
+a {
+    text-decoration: none;
+    color: var(--primary-color);
+    transition: color 0.2s;
+}
+
+a:hover {
+    color: var(--primary-hover);
+}
+
+/* 布局组件样式 */
+.header {
+    padding: 16px 24px;
+    background-color: var(--card-color);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.logo h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.content {
+    padding: 24px;
+    max-width: 1200px;
+    margin: 0 auto;
+    min-height: calc(100vh - 140px);
+}
+
+.main-card {
+    margin-bottom: 24px;
+}
+
+.footer {
+    padding: 16px 24px;
+    background-color: var(--card-color);
+    text-align: center;
+    font-size: 0.9rem;
+}
+
+.footer-content {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.footer-note {
+    margin-top: 8px;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+}
+
+/* 表单组件样式 */
+.main-card .n-tabs {
+    padding: 8px 0;
+}
+
+.download-section {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    margin-top: 16px;
+    padding: 16px 0;
+    border-top: 1px solid var(--divider-color);
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .header-content, .content {
+        padding: 16px;
+    }
+    
+    .logo h1 {
+        font-size: 1.2rem;
+    }
+    
+    .main-card {
+        padding: 12px;
+    }
+    
+    .download-section {
+        flex-direction: column;
+        align-items: center;
+    }
+}
+
+/* 用于调试时可视化布局 */
+.debug {
+    border: 1px solid red;
+} 

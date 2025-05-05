@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>不丢云应用生成器 - Helm Chart生成工具</title>
+    <link rel="stylesheet" href="https://unpkg.com/naive-ui@2.34.4/dist/index.css">
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://unpkg.com/vue@3.2.45/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/naive-ui@2.34.4/dist/index.js"></script>
+    <script src="https://unpkg.com/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
+    <script src="https://unpkg.com/@vicons/carbon@0.12.0/index.umd.js"></script>
+    <script src="https://unpkg.com/@vicons/ionicons5@0.12.0/index.umd.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <link rel="icon" href="assets/favicon.ico">
+</head>
+<body>
+    <div id="app">
+        <n-config-provider :theme="theme">
+            <n-message-provider>
+                <n-layout style="min-height: 100vh;">
+                    <n-layout-header bordered class="header">
+                        <div class="header-content">
+                            <div class="logo">
+                                <img src="assets/logo.svg" alt="不丢云应用生成器" width="40">
+                                <h1>不丢云应用生成器</h1>
+                            </div>
+                            <div class="theme-switch">
+                                <n-switch v-model:value="darkMode" @update:value="toggleTheme">
+                                    <template #checked>
+                                        <n-icon :component="MoonOutline" />
+                                    </template>
+                                    <template #unchecked>
+                                        <n-icon :component="SunnyOutline" />
+                                    </template>
+                                </n-switch>
+                            </div>
+                        </div>
+                    </n-layout-header>
+                    
+                    <n-layout-content class="content">
+                        <n-card title="Helm Chart 生成器" class="main-card">
+                            <n-tabs type="line" animated>
+                                <n-tab-pane name="basic" tab="基本信息">
+                                    <n-form :model="formData" label-placement="left" label-width="160" require-mark-placement="right-hanging">
+                                        <n-form-item label="应用名称" required>
+                                            <n-input v-model:value="formData.name" placeholder="例如：mysql" clearable />
+                                        </n-form-item>
+                                        <n-form-item label="应用版本" required>
+                                            <n-input v-model:value="formData.version" placeholder="例如：1.0.0" clearable />
+                                        </n-form-item>
+                                        <n-form-item label="应用程序版本" required>
+                                            <n-input v-model:value="formData.appVersion" placeholder="例如：8.0" clearable />
+                                        </n-form-item>
+                                        <n-form-item label="应用描述" required>
+                                            <n-input v-model:value="formData.description" type="textarea" placeholder="简要描述应用功能" clearable />
+                                        </n-form-item>
+                                        <n-form-item label="图标URL" required>
+                                            <n-input v-model:value="formData.icon" placeholder="例如：https://example.com/icon.png" clearable />
+                                        </n-form-item>
+                                        <n-form-item label="关键词">
+                                            <n-dynamic-tags v-model:value="formData.keywords" />
+                                        </n-form-item>
+                                        <n-form-item label="源代码链接">
+                                            <n-dynamic-input v-model:value="formData.sources" />
+                                        </n-form-item>
+                                        <n-form-item label="应用分类" required>
+                                            <n-select v-model:value="formData.category" :options="categoryOptions" />
+                                        </n-form-item>
+                                        <n-divider title-placement="left">维护者信息</n-divider>
+                                        <n-form-item label="维护者姓名" required>
+                                            <n-input v-model:value="formData.maintainer.name" placeholder="例如：niehaoran" clearable />
+                                        </n-form-item>
+                                        <n-form-item label="维护者邮箱" required>
+                                            <n-input v-model:value="formData.maintainer.email" placeholder="例如：example@example.com" clearable />
+                                        </n-form-item>
+                                    </n-form>
+                                </n-tab-pane>
+                                
+                                <n-tab-pane name="image" tab="容器镜像">
+                                    <n-form :model="formData.image" label-placement="left" label-width="160" require-mark-placement="right-hanging">
+                                        <n-form-item label="镜像仓库地址" required>
+                                            <n-input v-model:value="formData.image.imageRegistry" placeholder="例如：docker.io" clearable />
+                                        </n-form-item>
+                                        <n-form-item label="镜像名称" required>
+                                            <n-input v-model:value="formData.image.repository" placeholder="例如：mysql" clearable />
+                                        </n-form-item>
+                                        <n-form-item label="镜像标签" required>
+                                            <n-input v-model:value="formData.image.tag" placeholder="例如：8.0" clearable />
+                                        </n-form-item>
+                                        <n-form-item label="镜像拉取策略" required>
+                                            <n-select v-model:value="formData.image.pullPolicy" :options="pullPolicyOptions" />
+                                        </n-form-item>
+                                    </n-form>
+                                </n-tab-pane>
+                                
+                                <n-tab-pane name="service" tab="服务配置">
+                                    <n-form :model="formData.service" label-placement="left" label-width="160" require-mark-placement="right-hanging">
+                                        <n-form-item label="服务类型" required>
+                                            <n-select v-model:value="formData.service.type" :options="serviceTypeOptions" />
+                                        </n-form-item>
+                                        <n-form-item label="服务端口" required>
+                                            <n-input-number v-model:value="formData.service.port" :min="1" :max="65535" />
+                                        </n-form-item>
+                                    </n-form>
+                                </n-tab-pane>
+                                
+                                <n-tab-pane name="resources" tab="资源与存储">
+                                    <n-form label-placement="left" label-width="240" require-mark-placement="right-hanging">
+                                        <n-collapse>
+                                            <n-collapse-item title="网络带宽限制" name="network">
+                                                <n-form-item label="启用网络带宽限制">
+                                                    <n-switch v-model:value="formData.networkLimits.enabled" />
+                                                </n-form-item>
+                                                <n-form-item v-if="formData.networkLimits.enabled" label="出站带宽限制">
+                                                    <n-input v-model:value="formData.networkLimits.egress" placeholder="例如：1M" clearable />
+                                                </n-form-item>
+                                                <n-form-item v-if="formData.networkLimits.enabled" label="入站带宽限制">
+                                                    <n-input v-model:value="formData.networkLimits.ingress" placeholder="例如：1M" clearable />
+                                                </n-form-item>
+                                            </n-collapse-item>
+                                            
+                                            <n-collapse-item title="资源配置" name="resources">
+                                                <n-form-item label="CPU限制 (核心数或毫核，如200m)">
+                                                    <n-input v-model:value="formData.resources.limits.cpu" placeholder="例如：200m" clearable />
+                                                </n-form-item>
+                                                <n-form-item label="内存限制 (Mi或Gi，如256Mi)">
+                                                    <n-input v-model:value="formData.resources.limits.memory" placeholder="例如：256Mi" clearable />
+                                                </n-form-item>
+                                                <n-form-item label="CPU请求 (核心数或毫核，如100m)">
+                                                    <n-input v-model:value="formData.resources.requests.cpu" placeholder="例如：100m" clearable />
+                                                </n-form-item>
+                                                <n-form-item label="内存请求 (Mi或Gi，如128Mi)">
+                                                    <n-input v-model:value="formData.resources.requests.memory" placeholder="例如：128Mi" clearable />
+                                                </n-form-item>
+                                            </n-collapse-item>
+                                            
+                                            <n-collapse-item title="持久化存储" name="persistence">
+                                                <n-form-item label="启用持久化存储">
+                                                    <n-switch v-model:value="formData.persistence.enabled" />
+                                                </n-form-item>
+                                                <n-form-item v-if="formData.persistence.enabled" label="数据挂载路径">
+                                                    <n-input v-model:value="formData.persistence.path" placeholder="例如：/data" clearable />
+                                                </n-form-item>
+                                                <n-form-item v-if="formData.persistence.enabled" label="访问模式">
+                                                    <n-select v-model:value="formData.persistence.accessMode" :options="accessModeOptions" />
+                                                </n-form-item>
+                                                <n-form-item v-if="formData.persistence.enabled" label="存储大小">
+                                                    <n-input v-model:value="formData.persistence.size" placeholder="例如：1Gi" clearable />
+                                                </n-form-item>
+                                                <n-form-item v-if="formData.persistence.enabled" label="存储类名称">
+                                                    <n-input v-model:value="formData.persistence.storageClass" placeholder="例如：local" clearable />
+                                                </n-form-item>
+                                            </n-collapse-item>
+                                        </n-collapse>
+                                    </n-form>
+                                </n-tab-pane>
+                                
+                                <n-tab-pane name="env" tab="环境变量">
+                                    <n-space vertical>
+                                        <n-alert title="环境变量配置" type="info">
+                                            添加应用程序所需的环境变量，系统会自动生成env1、env2等格式的环境变量配置。
+                                        </n-alert>
+                                        
+                                        <n-dynamic-input v-model:value="envVars" #="{ index }">
+                                            <div style="display: flex; width: 100%;">
+                                                <n-input v-model:value="envVars[index].name" style="margin-right: 12px; width: 40%;" placeholder="环境变量名称" />
+                                                <n-input v-model:value="envVars[index].value" style="width: 60%;" placeholder="环境变量值" />
+                                            </div>
+                                        </n-dynamic-input>
+                                    </n-space>
+                                </n-tab-pane>
+                                
+                                <n-tab-pane name="preview" tab="预览生成">
+                                    <n-space vertical size="large">
+                                        <n-tabs type="segment">
+                                            <n-tab-pane name="chart" tab="Chart.yaml">
+                                                <n-code :code="generateChartYaml()" language="yaml" show-line-numbers />
+                                            </n-tab-pane>
+                                            <n-tab-pane name="values" tab="values.yaml">
+                                                <n-code :code="generateValuesYaml()" language="yaml" show-line-numbers />
+                                            </n-tab-pane>
+                                            <n-tab-pane name="deployment" tab="deployment.yaml">
+                                                <n-code :code="generateDeploymentYaml()" language="yaml" show-line-numbers />
+                                            </n-tab-pane>
+                                            <n-tab-pane name="service" tab="service.yaml">
+                                                <n-code :code="generateServiceYaml()" language="yaml" show-line-numbers />
+                                            </n-tab-pane>
+                                            <n-tab-pane name="pvc" tab="pvc.yaml">
+                                                <n-code :code="generatePvcYaml()" language="yaml" show-line-numbers />
+                                            </n-tab-pane>
+                                            <n-tab-pane name="helpers" tab="_helpers.tpl">
+                                                <n-code :code="generateHelpersTpl()" language="go-template" show-line-numbers />
+                                            </n-tab-pane>
+                                        </n-tabs>
+                                        
+                                        <div class="download-section">
+                                            <n-button type="primary" size="large" @click="downloadAll">
+                                                <template #icon>
+                                                    <n-icon :component="DownloadOutline" />
+                                                </template>
+                                                下载Helm Chart文件包
+                                            </n-button>
+                                            <n-button type="default" size="large" @click="resetForm">
+                                                <template #icon>
+                                                    <n-icon :component="RefreshOutline" />
+                                                </template>
+                                                重置表单
+                                            </n-button>
+                                        </div>
+                                    </n-space>
+                                </n-tab-pane>
+                            </n-tabs>
+                        </n-card>
+                    </n-layout-content>
+                    
+                    <n-layout-footer bordered class="footer">
+                        <div class="footer-content">
+                            <p>© 2023 不丢云应用生成器 | <a href="https://github.com/yourusername/AppStoreGenerators-" target="_blank">GitHub</a></p>
+                            <p class="footer-note">基于开源技术构建，适用于Kubernetes环境下的应用部署</p>
+                        </div>
+                    </n-layout-footer>
+                </n-layout>
+            </n-message-provider>
+        </n-config-provider>
+    </div>
+    
+    <script src="js/main.js"></script>
+</body>
+</html> 

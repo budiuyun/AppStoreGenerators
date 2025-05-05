@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <style>
+    .helm-logo { fill: #0F1689; }
+    .ship-wheel { fill: #277BC0; }
+    .k8s-wheel { fill: #326CE5; }
+    @media (prefers-color-scheme: dark) {
+      .helm-logo { fill: #277BC0; }
+      .ship-wheel { fill: #7DE5ED; }
+      .k8s-wheel { fill: #61DAFB; }
+    }
+  </style>
+  <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" stroke-width="5"/>
+  <g class="helm-logo">
+    <path d="M50 18 L65 30 L65 55 L50 67 L35 55 L35 30 Z" />
+  </g>
+  <g class="ship-wheel">
+    <circle cx="50" cy="50" r="12" />
+    <path d="M50 25 L50 35 M50 65 L50 75 M25 50 L35 50 M65 50 L75 50 M33 33 L40 40 M60 60 L67 67 M33 67 L40 60 M67 33 L60 40" stroke-width="5" stroke="currentColor" />
+  </g>
+  <g class="k8s-wheel">
+    <circle cx="50" cy="50" r="5" fill="#FFF" />
+  </g>
+</svg> 
