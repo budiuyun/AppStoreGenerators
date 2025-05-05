@@ -167,7 +167,7 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('preview-chart').textContent = generateChartYaml();
         document.getElementById('preview-values').textContent = generateValuesYaml();
         document.getElementById('preview-schema').textContent = generateValuesSchemaJson();
-        document.getElementById('preview-deployment').textContent = generateDeploymentYaml();
+        document.getElementById('preview-workload').textContent = generateWorkloadYaml();
         document.getElementById('preview-service').textContent = generateServiceYaml();
         document.getElementById('preview-pvc').textContent = generatePvcYaml();
         document.getElementById('preview-helpers').textContent = generateHelpersTpl();
@@ -219,6 +219,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 name: document.getElementById('maintainerName').value.trim(),
                 email: document.getElementById('maintainerEmail').value.trim()
             },
+            // 添加工作负载类型
+            workloadType: document.getElementById('workloadType').value,
             image: {
                 imageRegistry: document.getElementById('imageRegistry').value.trim(),
                 repository: document.getElementById('repository').value.trim(),
@@ -365,6 +367,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const values = {
             replicaCount: 1,
+            workloadType: formData.workloadType,
             image: {
                 imageRegistry: formData.image.imageRegistry,
                 repository: formData.image.repository,
@@ -411,6 +414,7 @@ document.addEventListener('DOMContentLoaded', function() {
             "title": `${formData.name} Helm Chart 配置`,
             "required": [
                 "replicaCount",
+                "workloadType",
                 "image",
                 "service",
                 "networkLimits",
@@ -423,6 +427,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     "description": "Deployment的副本数量",
                     "default": 1,
                     "minimum": 1
+                },
+                "workloadType": {
+                    "type": "string",
+                    "title": "工作负载类型",
+                    "description": "指定部署为有状态集(StatefulSet)或无状态部署(Deployment)",
+                    "enum": ["Deployment", "StatefulSet"],
+                    "default": formData.workloadType
                 },
                 "image": {
                     "type": "object",
@@ -663,18 +674,26 @@ document.addEventListener('DOMContentLoaded', function() {
         return JSON.stringify(schema, null, 2);
     }
     
-    // 生成deployment.yaml
-    function generateDeploymentYaml() {
+    // 生成工作负载YAML
+    function generateWorkloadYaml() {
         const formData = getFormData();
         
-        // 生成容器端口配置
-        let containerPortsYaml = '';
-        formData.service.ports.forEach(port => {
-            containerPortsYaml += `
-            - name: ${port.name}
+        // 根据工作负载类型选择模板
+        if (formData.workloadType === 'StatefulSet') {
+            return generateStatefulSetYaml(formData);
+        } else {
+            return generateDeploymentYaml(formData);
+        }
+    }
+    
+    // 生成Deployment YAML
+    function generateDeploymentYaml(formData) {
+        // 端口配置
+        const portsConfig = formData.service.ports.map(port => 
+            `            - name: ${port.name}
               containerPort: ${port.port}
-              protocol: TCP`;
-        });
+              protocol: TCP`
+        ).join('\n');
         
         return `apiVersion: apps/v1
 kind: Deployment
@@ -704,7 +723,8 @@ spec:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.imageRegistry }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          ports:${containerPortsYaml}
+          ports:
+${portsConfig}
           {{- if .Values.env }}
           env:
             {{- if kindIs "map" .Values.env }}
@@ -736,6 +756,88 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: {{ include "${formData.name}.fullname" . }}-pvc
+      {{- end }}`;
+    }
+    
+    // 生成StatefulSet YAML
+    function generateStatefulSetYaml(formData) {
+        // 端口配置
+        const portsConfig = formData.service.ports.map(port => 
+            `            - name: ${port.name}
+              containerPort: ${port.port}
+              protocol: TCP`
+        ).join('\n');
+        
+        return `apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "${formData.name}.fullname" . }}
+  labels:
+    {{- include "${formData.name}.labels" . | nindent 4 }}
+  annotations:
+    app.kubernetes.io/part-of: ${formData.name}
+spec:
+  serviceName: {{ include "${formData.name}.fullname" . }}
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "${formData.name}.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "${formData.name}.labels" . | nindent 8 }}
+        {{- include "${formData.name}.selectorLabels" . | nindent 8 }}
+      {{- if .Values.networkLimits.enabled }}
+      annotations:
+        kubernetes.io/egress-bandwidth: {{ .Values.networkLimits.egress | quote }}
+        kubernetes.io/ingress-bandwidth: {{ .Values.networkLimits.ingress | quote }}
+      {{- end }}
+    spec:
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.imageRegistry }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+${portsConfig}
+          {{- if .Values.env }}
+          env:
+            {{- if kindIs "map" .Values.env }}
+            {{- range $key, $value := .Values.env }}
+            - name: {{ $value.name | quote }}
+              value: {{ $value.value | quote }}
+            {{- end }}
+            {{- else if kindIs "array" .Values.env }}
+            {{- range .Values.env }}
+            - name: {{ .name | quote }}
+              value: {{ .value | quote }}
+            {{- end }}
+            {{- end }}
+          {{- end }}
+          resources:
+            limits:
+              cpu: {{ .Values.resources.limits.cpu | quote }}
+              memory: {{ .Values.resources.limits.memory | quote }}
+            requests:
+              cpu: {{ .Values.resources.requests.cpu | quote }}
+              memory: {{ .Values.resources.requests.memory | quote }}
+          {{- if .Values.persistence.enabled }}
+          volumeMounts:
+            - name: data
+              mountPath: {{ .Values.persistence.path }}
+          {{- end }}
+      {{- if .Values.persistence.enabled }}
+      volumeClaimTemplates:
+        - metadata:
+            name: data
+          spec:
+            accessModes:
+              - {{ .Values.persistence.accessMode }}
+            {{- if .Values.persistence.storageClass }}
+            storageClassName: {{ .Values.persistence.storageClass }}
+            {{- end }}
+            resources:
+              requests:
+                storage: {{ .Values.persistence.size }}
       {{- end }}`;
     }
     
@@ -845,8 +947,6 @@ app.kubernetes.io/instance: {{ .Release.Name }}
         }
         
         const formData = getFormData();
-        
-        // 创建一个JSZip实例
         const zip = new JSZip();
         
         // 创建目录结构
@@ -857,37 +957,54 @@ app.kubernetes.io/instance: {{ .Release.Name }}
         chartDir.file('Chart.yaml', generateChartYaml());
         chartDir.file('values.yaml', generateValuesYaml());
         chartDir.file('values.schema.json', generateValuesSchemaJson());
-        templatesDir.file('deployment.yaml', generateDeploymentYaml());
+        
+        // 根据工作负载类型创建不同的文件名
+        if (formData.workloadType === 'StatefulSet') {
+            templatesDir.file('statefulset.yaml', generateWorkloadYaml());
+        } else {
+            templatesDir.file('deployment.yaml', generateWorkloadYaml());
+        }
+        
         templatesDir.file('service.yaml', generateServiceYaml());
-        templatesDir.file('pvc.yaml', generatePvcYaml());
+        
+        // 只有在Deployment工作负载时才需要单独的PVC文件
+        if (formData.workloadType === 'Deployment' && formData.persistence.enabled) {
+            templatesDir.file('pvc.yaml', generatePvcYaml());
+        }
+        
         templatesDir.file('_helpers.tpl', generateHelpersTpl());
         
         // 生成README.md
-        const readme = `# ${formData.name}
+        const readmeContent = `# ${formData.name}
 
 ${formData.description}
+
+## 工作负载类型
+
+此Helm Chart使用 \`${formData.workloadType}\` 工作负载类型。
+
+${formData.workloadType === 'StatefulSet' ? '- StatefulSet适合有状态应用，提供持久标识和存储' : '- Deployment适合无状态应用，方便快速扩展和更新'}
 
 ## 参数
 
 | 参数 | 描述 | 默认值 |
 |------|------|--------|
 | replicaCount | 副本数量 | \`1\` |
+| workloadType | 工作负载类型 | \`${formData.workloadType}\` |
 | image.repository | 镜像名称 | \`${formData.image.repository}\` |
 | image.tag | 镜像标签 | \`${formData.image.tag}\` |
 | image.pullPolicy | 镜像拉取策略 | \`${formData.image.pullPolicy}\` |
 | service.type | 服务类型 | \`${formData.service.type}\` |
-| service.ports | 服务端口 | 参见values.yaml |
-| resources | 资源限制/请求 | 参见values.yaml |
 | persistence.enabled | 是否启用持久化存储 | \`${formData.persistence.enabled}\` |
 | persistence.size | 存储大小 | \`${formData.persistence.size}\` |
 
 ## 安装方法
 
 \`\`\`bash
-helm install my-release ./charts/${formData.name}
-\`\`\`
-`;
-        chartDir.file('README.md', readme);
+helm install my-release ./${formData.name}
+\`\`\``;
+
+        chartDir.file('README.md', readmeContent);
         
         // 生成并下载zip文件
         zip.generateAsync({ type: 'blob' }).then(function(content) {
@@ -898,111 +1015,85 @@ helm install my-release ./charts/${formData.name}
             link.click();
             URL.revokeObjectURL(url);
             
-            // 显示成功消息
             alert('Helm Chart文件已成功生成并下载');
         });
     }
     
     // 重置表单
     function resetForm() {
-        // 基本信息
-        document.getElementById('name').value = '';
+        if (!confirm('确定要重置所有表单内容吗？这将丢失所有已填写的数据。')) {
+            return;
+        }
+        
+        // 重置基本信息
+        document.getElementById('name').value = 'myapp';
         document.getElementById('version').value = 'v1.0.0';
         document.getElementById('appVersion').value = '1.0.0';
         document.getElementById('description').value = '';
-        document.getElementById('icon').value = '';
+        document.getElementById('icon').value = 'https://example.com/icon.png';
         document.getElementById('category').value = '应用工具';
         document.getElementById('customCategory').value = '';
         document.getElementById('customCategory').style.display = 'none';
         document.getElementById('maintainerName').value = '';
         document.getElementById('maintainerEmail').value = '';
         
-        // 容器镜像
+        // 重置工作负载类型
+        document.getElementById('workloadType').value = 'Deployment';
+        
+        // 重置容器镜像
         document.getElementById('imageRegistry').value = 'docker.io';
         document.getElementById('repository').value = '';
         document.getElementById('tag').value = 'latest';
-        // 镜像拉取策略固定为IfNotPresent
         document.getElementById('pullPolicy').value = 'IfNotPresent';
         
-        // 服务配置 - 重置为单个端口
-        const portContainer = document.getElementById('service-ports-container');
-        portContainer.innerHTML = `
-            <div class="service-port-row">
-                <div class="form-group port-name">
-                    <label>端口名称</label>
-                    <input type="text" class="port-name-input" placeholder="例如：http" value="http">
-                </div>
-                <div class="form-group port-number">
-                    <label>端口号</label>
-                    <input type="number" class="port-number-input" min="1" max="65535" value="80">
-                </div>
-                <button type="button" class="remove-port">删除</button>
-            </div>
-        `;
+        // 重置服务设置
+        document.getElementById('serviceType').value = 'ClusterIP';
         
-        // 重新绑定删除端口按钮事件
-        document.querySelectorAll('.remove-port').forEach(btn => {
-            btn.addEventListener('click', function() {
-                // 如果只有一个端口，不允许删除
-                if (document.querySelectorAll('.service-port-row').length <= 1) {
-                    alert('至少需要一个服务端口！');
-                    return;
-                }
-                this.closest('.service-port-row').remove();
-            });
-        });
+        // 移除所有额外的端口行
+        const portRows = document.querySelectorAll('.service-port-row');
+        for (let i = 1; i < portRows.length; i++) {
+            portRows[i].remove();
+        }
         
-        // 网络带宽限制
+        // 重置第一个端口行
+        if (portRows.length > 0) {
+            const firstPortRow = portRows[0];
+            firstPortRow.querySelector('.port-name-input').value = 'http';
+            firstPortRow.querySelector('.port-number-input').value = '80';
+        }
+        
+        // 重置网络限制
         document.getElementById('networkEnabled').checked = true;
         document.getElementById('egress').value = '1M';
         document.getElementById('ingress').value = '1M';
         
-        // 资源配置
+        // 重置资源限制
         document.getElementById('limitsCpu').value = '200m';
         document.getElementById('limitsMemory').value = '256Mi';
         document.getElementById('requestsCpu').value = '100m';
         document.getElementById('requestsMemory').value = '128Mi';
         
-        // 持久化存储
+        // 重置持久化存储
         document.getElementById('persistenceEnabled').checked = true;
         document.getElementById('path').value = '/data';
         document.getElementById('accessMode').value = 'ReadWriteOnce';
         document.getElementById('size').value = '1Gi';
         document.getElementById('storageClass').value = 'local';
         
-        // 环境变量
-        const envContainer = document.getElementById('env-container');
-        envContainer.innerHTML = `
-            <div class="env-row">
-                <div class="form-group env-title">
-                    <label>环境变量中文名称</label>
-                    <input type="text" class="env-title-input" placeholder="例如：数据库名" value="应用模式">
-                </div>
-                <div class="form-group env-desc">
-                    <label>环境变量描述</label>
-                    <input type="text" class="env-desc-input" placeholder="例如：MySQL数据库名称" value="应用运行的模式">
-                </div>
-                <div class="form-group env-name">
-                    <label>变量名称</label>
-                    <input type="text" class="env-name-input" placeholder="例如：MYSQL_DATABASE" value="APP_MODE">
-                </div>
-                <div class="form-group env-value">
-                    <label>变量值</label>
-                    <input type="text" class="env-value-input" placeholder="环境变量值" value="production">
-                </div>
-                <button type="button" class="remove-env">删除</button>
-            </div>
-        `;
+        // 移除所有额外的环境变量行
+        const envRows = document.querySelectorAll('.env-row');
+        for (let i = 1; i < envRows.length; i++) {
+            envRows[i].remove();
+        }
         
-        // 重新绑定删除环境变量按钮事件
-        document.querySelectorAll('.remove-env').forEach(btn => {
-            btn.addEventListener('click', () => {
-                btn.closest('.env-row').remove();
-            });
-        });
-        
-        // 更新预览内容
-        updatePreviews();
+        // 重置第一个环境变量行
+        if (envRows.length > 0) {
+            const firstEnvRow = envRows[0];
+            firstEnvRow.querySelector('.env-title-input').value = '应用模式';
+            firstEnvRow.querySelector('.env-desc-input').value = '应用运行的模式';
+            firstEnvRow.querySelector('.env-name-input').value = 'APP_MODE';
+            firstEnvRow.querySelector('.env-value-input').value = 'production';
+        }
         
         alert('表单已重置');
     }

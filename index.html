@@ -81,6 +81,16 @@
                 <!-- 容器镜像 -->
                 <div class="tab-pane" id="image">
                     <h2>容器镜像</h2>
+                    
+                    <div class="form-group">
+                        <label for="workloadType">工作负载类型 *</label>
+                        <select id="workloadType" required>
+                            <option value="Deployment">Deployment (无状态应用)</option>
+                            <option value="StatefulSet">StatefulSet (有状态应用)</option>
+                        </select>
+                        <small class="form-note">Deployment适用于无状态应用，StatefulSet适用于有状态应用（如数据库）</small>
+                    </div>
+                    
                     <div class="form-group">
                         <label for="imageRegistry">镜像仓库地址 *</label>
                         <input type="text" id="imageRegistry" value="docker.io" required>
@@ -259,7 +269,7 @@
                         <button class="preview-tab active" data-preview="chart">Chart.yaml</button>
                         <button class="preview-tab" data-preview="values">values.yaml</button>
                         <button class="preview-tab" data-preview="schema">values.schema.json</button>
-                        <button class="preview-tab" data-preview="deployment">deployment.yaml</button>
+                        <button class="preview-tab" data-preview="workload">工作负载配置</button>
                         <button class="preview-tab" data-preview="service">service.yaml</button>
                         <button class="preview-tab" data-preview="pvc">pvc.yaml</button>
                         <button class="preview-tab" data-preview="helpers">_helpers.tpl</button>
@@ -269,7 +279,7 @@
                         <pre id="preview-chart" class="active"></pre>
                         <pre id="preview-values"></pre>
                         <pre id="preview-schema"></pre>
-                        <pre id="preview-deployment"></pre>
+                        <pre id="preview-workload"></pre>
                         <pre id="preview-service"></pre>
                         <pre id="preview-pvc"></pre>
                         <pre id="preview-helpers"></pre>

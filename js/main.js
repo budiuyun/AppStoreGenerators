@@ -39,6 +39,9 @@ const app = createApp({
                 email: 'maintainer@example.com'
             },
             
+            // 添加工作负载类型
+            workloadType: 'Deployment',
+            
             image: {
                 imageRegistry: 'docker.io',
                 repository: 'myapp',
@@ -92,6 +95,12 @@ const app = createApp({
             { label: '安全工具', value: '安全工具' },
             { label: '存储工具', value: '存储工具' },
             { label: '其他', value: '其他' }
+        ];
+        
+        // 工作负载类型选项
+        const workloadTypeOptions = [
+            { label: 'Deployment (无状态)', value: 'Deployment' },
+            { label: 'StatefulSet (有状态)', value: 'StatefulSet' }
         ];
         
         const pullPolicyOptions = [
@@ -150,6 +159,7 @@ const app = createApp({
         const generateValuesYaml = () => {
             const values = {
                 replicaCount: 1,
+                workloadType: formData.workloadType,
                 image: formData.image,
                 service: formData.service,
                 networkLimits: formData.networkLimits,
@@ -172,9 +182,86 @@ const app = createApp({
             return jsyaml.dump(values);
         };
         
-        // 生成deployment.yaml
-        const generateDeploymentYaml = () => {
-            return `apiVersion: apps/v1
+        // 生成工作负载YAML (之前的deployment.yaml)
+        const generateWorkloadYaml = () => {
+            // 根据工作负载类型生成不同的YAML
+            if (formData.workloadType === 'StatefulSet') {
+                return `apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "${formData.name}.fullname" . }}
+  labels:
+    {{- include "${formData.name}.labels" . | nindent 4 }}
+  annotations:
+    app.kubernetes.io/part-of: ${formData.name}
+spec:
+  serviceName: {{ include "${formData.name}.fullname" . }}
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "${formData.name}.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "${formData.name}.labels" . | nindent 8 }}
+        {{- include "${formData.name}.selectorLabels" . | nindent 8 }}
+      {{- if .Values.networkLimits.enabled }}
+      annotations:
+        kubernetes.io/egress-bandwidth: {{ .Values.networkLimits.egress | quote }}
+        kubernetes.io/ingress-bandwidth: {{ .Values.networkLimits.ingress | quote }}
+      {{- end }}
+    spec:
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.imageRegistry }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: ${formData.service.port}
+              protocol: TCP
+          {{- if .Values.env }}
+          env:
+            {{- if kindIs "map" .Values.env }}
+            {{- range $key, $value := .Values.env }}
+            - name: {{ $value.name | quote }}
+              value: {{ $value.value | quote }}
+            {{- end }}
+            {{- else if kindIs "array" .Values.env }}
+            {{- range .Values.env }}
+            - name: {{ .name | quote }}
+              value: {{ .value | quote }}
+            {{- end }}
+            {{- end }}
+          {{- end }}
+          resources:
+            limits:
+              cpu: {{ .Values.resources.limits.cpu | quote }}
+              memory: {{ .Values.resources.limits.memory | quote }}
+            requests:
+              cpu: {{ .Values.resources.requests.cpu | quote }}
+              memory: {{ .Values.resources.requests.memory | quote }}
+          {{- if .Values.persistence.enabled }}
+          volumeMounts:
+            - name: data
+              mountPath: {{ .Values.persistence.path }}
+          {{- end }}
+      {{- if .Values.persistence.enabled }}
+      volumeClaimTemplates:
+        - metadata:
+            name: data
+          spec:
+            accessModes:
+              - {{ .Values.persistence.accessMode }}
+            {{- if .Values.persistence.storageClass }}
+            storageClassName: {{ .Values.persistence.storageClass }}
+            {{- end }}
+            resources:
+              requests:
+                storage: {{ .Values.persistence.size }}
+      {{- end }}`;
+            } else {
+                // 默认Deployment
+                return `apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "${formData.name}.fullname" . }}
@@ -238,6 +325,7 @@ spec:
           persistentVolumeClaim:
             claimName: {{ include "${formData.name}.fullname" . }}-pvc
       {{- end }}`;
+            }
         };
         
         // 生成service.yaml
@@ -363,9 +451,21 @@ app.kubernetes.io/instance: {{ .Release.Name }}
             // 添加文件
             chartDir.file('Chart.yaml', generateChartYaml());
             chartDir.file('values.yaml', generateValuesYaml());
-            templatesDir.file('deployment.yaml', generateDeploymentYaml());
+            
+            // 根据工作负载类型添加相应文件
+            if (formData.workloadType === 'StatefulSet') {
+                templatesDir.file('statefulset.yaml', generateWorkloadYaml());
+            } else {
+                templatesDir.file('deployment.yaml', generateWorkloadYaml());
+            }
+            
             templatesDir.file('service.yaml', generateServiceYaml());
-            templatesDir.file('pvc.yaml', generatePvcYaml());
+            
+            // 只有在有状态集需要单独的PVC文件（非volumeClaimTemplates方式时）
+            if (formData.workloadType === 'Deployment' && formData.persistence.enabled) {
+                templatesDir.file('pvc.yaml', generatePvcYaml());
+            }
+            
             templatesDir.file('_helpers.tpl', generateHelpersTpl());
             
             // 生成README.md
@@ -373,11 +473,16 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 
 ${formData.description}
 
+## 工作负载类型
+
+此Helm Chart使用 \`${formData.workloadType}\` 工作负载类型
+
 ## 参数
 
 | 参数 | 描述 | 默认值 |
 |------|------|--------|
 | replicaCount | 副本数量 | \`1\` |
+| workloadType | 工作负载类型 | \`${formData.workloadType}\` |
 | image.repository | 镜像名称 | \`${formData.image.repository}\` |
 | image.tag | 镜像标签 | \`${formData.image.tag}\` |
 | image.pullPolicy | 镜像拉取策略 | \`${formData.image.pullPolicy}\` |
@@ -422,6 +527,9 @@ helm install my-release ./charts/${formData.name}
             formData.maintainer.name = 'maintainer';
             formData.maintainer.email = 'maintainer@example.com';
             
+            // 重置工作负载类型
+            formData.workloadType = 'Deployment';
+            
             formData.image.imageRegistry = 'docker.io';
             formData.image.repository = 'myapp';
             formData.image.tag = 'latest';
@@ -460,12 +568,13 @@ helm install my-release ./charts/${formData.name}
             formData,
             envVars,
             categoryOptions,
+            workloadTypeOptions,
             pullPolicyOptions,
             serviceTypeOptions,
             accessModeOptions,
             generateChartYaml,
             generateValuesYaml,
-            generateDeploymentYaml,
+            generateWorkloadYaml,
             generateServiceYaml,
             generatePvcYaml,
             generateHelpersTpl,
