@@ -149,6 +149,19 @@ document.addEventListener('DOMContentLoaded', function() {
     const resetBtn = document.getElementById('reset-btn');
     resetBtn.addEventListener('click', resetForm);
     
+    // 处理自定义分类
+    const categorySelect = document.getElementById('category');
+    const customCategoryInput = document.getElementById('customCategory');
+    
+    categorySelect.addEventListener('change', () => {
+        if (categorySelect.value === 'custom') {
+            customCategoryInput.style.display = 'block';
+            customCategoryInput.focus();
+        } else {
+            customCategoryInput.style.display = 'none';
+        }
+    });
+    
     // 更新预览内容
     function updatePreviews() {
         document.getElementById('preview-chart').textContent = generateChartYaml();
@@ -164,6 +177,14 @@ document.addEventListener('DOMContentLoaded', function() {
     function getFormData() {
         const networkEnabled = document.getElementById('networkEnabled').checked;
         const persistenceEnabled = document.getElementById('persistenceEnabled').checked;
+        const categorySelect = document.getElementById('category');
+        const customCategoryInput = document.getElementById('customCategory');
+        
+        // 确定分类值
+        let category = categorySelect.value;
+        if (category === 'custom' && customCategoryInput.value.trim()) {
+            category = customCategoryInput.value.trim();
+        }
         
         // 收集服务端口
         const servicePorts = [];
@@ -193,7 +214,7 @@ document.addEventListener('DOMContentLoaded', function() {
             appVersion: document.getElementById('appVersion').value.trim(),
             description: document.getElementById('description').value.trim(),
             icon: document.getElementById('icon').value.trim(),
-            category: document.getElementById('category').value,
+            category: category,
             maintainer: {
                 name: document.getElementById('maintainerName').value.trim(),
                 email: document.getElementById('maintainerEmail').value.trim()
@@ -237,6 +258,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // 表单验证
     function validateForm() {
         const formData = getFormData();
+        const categorySelect = document.getElementById('category');
+        const customCategoryInput = document.getElementById('customCategory');
         
         // 必填字段验证
         if (!formData.name) {
@@ -261,6 +284,13 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (!formData.icon) {
             alert('请填写图标URL');
+            return false;
+        }
+        
+        // 验证分类
+        if (categorySelect.value === 'custom' && !customCategoryInput.value.trim()) {
+            alert('请输入自定义分类名称');
+            customCategoryInput.focus();
             return false;
         }
         
@@ -440,12 +470,24 @@ document.addEventListener('DOMContentLoaded', function() {
                         "ports": {
                             "type": "object",
                             "title": "服务端口配置",
-                            "description": "服务暴露的端口配置",
-                            "additionalProperties": {
-                                "type": "integer",
-                                "minimum": 1,
-                                "maximum": 65535
-                            }
+                            "description": "服务暴露的端口配置，键为端口名称，值为端口号",
+                            "patternProperties": {
+                                "^.*$": {
+                                    "type": "integer",
+                                    "title": "端口号",
+                                    "description": "服务端口号",
+                                    "minimum": 1,
+                                    "maximum": 65535
+                                }
+                            },
+                            "additionalProperties": false,
+                            "examples": [
+                                {
+                                    "http": 80,
+                                    "https": 443,
+                                    "metrics": 8080
+                                }
+                            ]
                         }
                     }
                 },
@@ -870,6 +912,8 @@ helm install my-release ./charts/${formData.name}
         document.getElementById('description').value = '';
         document.getElementById('icon').value = '';
         document.getElementById('category').value = '应用工具';
+        document.getElementById('customCategory').value = '';
+        document.getElementById('customCategory').style.display = 'none';
         document.getElementById('maintainerName').value = '';
         document.getElementById('maintainerEmail').value = '';
         
@@ -877,6 +921,7 @@ helm install my-release ./charts/${formData.name}
         document.getElementById('imageRegistry').value = 'docker.io';
         document.getElementById('repository').value = '';
         document.getElementById('tag').value = 'latest';
+        // 镜像拉取策略固定为IfNotPresent
         document.getElementById('pullPolicy').value = 'IfNotPresent';
         
         // 服务配置 - 重置为单个端口

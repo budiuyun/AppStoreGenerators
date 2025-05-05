@@ -50,16 +50,23 @@
                     </div>
                     <div class="form-group">
                         <label for="category">应用分类 *</label>
-                        <select id="category" required>
-                            <option value="应用工具">应用工具</option>
-                            <option value="数据库">数据库</option>
-                            <option value="开发工具">开发工具</option>
-                            <option value="监控工具">监控工具</option>
-                            <option value="网络工具">网络工具</option>
-                            <option value="安全工具">安全工具</option>
-                            <option value="存储工具">存储工具</option>
-                            <option value="其他">其他</option>
-                        </select>
+                        <div class="category-selection">
+                            <select id="category" required>
+                                <option value="应用工具">应用工具</option>
+                                <option value="数据库">数据库</option>
+                                <option value="开发工具">开发工具</option>
+                                <option value="监控工具">监控工具</option>
+                                <option value="网络工具">网络工具</option>
+                                <option value="安全工具">安全工具</option>
+                                <option value="存储工具">存储工具</option>
+                                <option value="中间件">中间件</option>
+                                <option value="人工智能">人工智能</option>
+                                <option value="大数据">大数据</option>
+                                <option value="容器与编排">容器与编排</option>
+                                <option value="custom">自定义分类...</option>
+                            </select>
+                            <input type="text" id="customCategory" placeholder="输入自定义分类名称" style="display: none;">
+                        </div>
                     </div>
                     <div class="form-group">
                         <label for="maintainerName">维护者姓名 *</label>
@@ -86,14 +93,13 @@
                         <label for="tag">镜像标签 *</label>
                         <input type="text" id="tag" placeholder="例如：8.0" value="latest" required>
                     </div>
-                    <div class="form-group">
-                        <label for="pullPolicy">镜像拉取策略 *</label>
-                        <select id="pullPolicy" required>
-                            <option value="IfNotPresent" selected>IfNotPresent (推荐)</option>
-                            <option value="Always" disabled>Always (不可用)</option>
-                            <option value="Never" disabled>Never (不可用)</option>
-                        </select>
-                        <small class="form-note">注意: 出于安全和性能考虑，只允许使用IfNotPresent拉取策略</small>
+                    <div class="form-group disabled-group">
+                        <label>镜像拉取策略</label>
+                        <div class="fixed-value-display">
+                            <span class="fixed-value">IfNotPresent</span>
+                            <span class="fixed-value-note">出于安全和性能考虑，拉取策略已固定为IfNotPresent</span>
+                            <input type="hidden" id="pullPolicy" value="IfNotPresent">
+                        </div>
                     </div>
                 </div>
 
