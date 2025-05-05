@@ -88,10 +88,12 @@
                     </div>
                     <div class="form-group">
                         <label for="pullPolicy">镜像拉取策略 *</label>
-                        <select id="pullPolicy" required disabled>
+                        <select id="pullPolicy" required>
                             <option value="IfNotPresent" selected>IfNotPresent (推荐)</option>
+                            <option value="Always" disabled>Always (不可用)</option>
+                            <option value="Never" disabled>Never (不可用)</option>
                         </select>
-                        <p class="info">出于安全和性能考虑，镜像拉取策略固定为IfNotPresent</p>
+                        <small class="form-note">注意: 出于安全和性能考虑，只允许使用IfNotPresent拉取策略</small>
                     </div>
                 </div>
 
@@ -102,20 +104,31 @@
                         <label for="serviceType">服务类型 *</label>
                         <select id="serviceType" required disabled>
                             <option value="ClusterIP" selected>ClusterIP</option>
+                            <option value="NodePort" disabled>NodePort (不可用)</option>
+                            <option value="LoadBalancer" disabled>LoadBalancer (不可用)</option>
                         </select>
-                        <p class="info">服务类型固定为ClusterIP</p>
+                        <small class="form-note">注意: 服务类型必须是ClusterIP</small>
                     </div>
                     
-                    <div class="port-section">
+                    <div class="service-ports-section">
                         <h3>服务端口配置</h3>
-                        <p class="info">可以添加多个端口，每个端口需要指定名称和端口号</p>
-                        <div id="port-container">
-                            <div class="port-row">
-                                <input type="text" class="port-name" placeholder="端口名称" value="http">
-                                <input type="number" class="port-number" placeholder="端口号" value="80" min="1" max="65535">
+                        <p class="info">可配置多个服务端口，每个端口需指定名称和端口号</p>
+                        
+                        <div id="service-ports-container">
+                            <!-- 默认端口配置行 -->
+                            <div class="service-port-row">
+                                <div class="form-group port-name">
+                                    <label>端口名称</label>
+                                    <input type="text" class="port-name-input" placeholder="例如：http" value="http">
+                                </div>
+                                <div class="form-group port-number">
+                                    <label>端口号</label>
+                                    <input type="number" class="port-number-input" min="1" max="65535" value="80">
+                                </div>
                                 <button type="button" class="remove-port">删除</button>
                             </div>
                         </div>
+                        
                         <button type="button" id="add-port">添加端口</button>
                     </div>
                 </div>
@@ -126,17 +139,21 @@
                     
                     <div class="section">
                         <h3>网络带宽限制</h3>
-                        <p class="info">网络带宽限制必须启用</p>
+                        <div class="form-group disabled-group">
+                            <label for="networkEnabled">启用网络带宽限制</label>
+                            <input type="checkbox" id="networkEnabled" checked disabled>
+                            <small class="form-note">注意: 网络带宽限制必须启用</small>
+                        </div>
                         <div class="network-settings">
                             <div class="form-group">
-                                <label for="egress">出站带宽限制</label>
-                                <input type="text" id="egress" placeholder="例如：1M" value="1M">
-                                <p class="field-desc">格式为数字+单位(K,M,G)</p>
+                                <label for="egress">出站带宽限制 (数字+K,M,G)</label>
+                                <input type="text" id="egress" placeholder="例如：1M" value="1M" pattern="^[0-9]+[KMG]$">
+                                <small class="form-note">格式必须是数字+K/M/G，例如：1M</small>
                             </div>
                             <div class="form-group">
-                                <label for="ingress">入站带宽限制</label>
-                                <input type="text" id="ingress" placeholder="例如：1M" value="1M">
-                                <p class="field-desc">格式为数字+单位(K,M,G)</p>
+                                <label for="ingress">入站带宽限制 (数字+K,M,G)</label>
+                                <input type="text" id="ingress" placeholder="例如：1M" value="1M" pattern="^[0-9]+[KMG]$">
+                                <small class="form-note">格式必须是数字+K/M/G，例如：1M</small>
                             </div>
                         </div>
                     </div>
@@ -144,24 +161,24 @@
                     <div class="section">
                         <h3>资源配置</h3>
                         <div class="form-group">
-                            <label for="limitsCpu">CPU限制</label>
-                            <input type="text" id="limitsCpu" placeholder="例如：200m" value="200m">
-                            <p class="field-desc">可以是m(千分之一核)或直接的核心数</p>
+                            <label for="limitsCpu">CPU限制 (例如: 200m)</label>
+                            <input type="text" id="limitsCpu" placeholder="例如：200m" value="200m" pattern="^[0-9]+m?$">
+                            <small class="form-note">可以是m(千分之一核)或直接的核心数</small>
                         </div>
                         <div class="form-group">
-                            <label for="limitsMemory">内存限制</label>
-                            <input type="text" id="limitsMemory" placeholder="例如：256Mi" value="256Mi">
-                            <p class="field-desc">可以是Mi(兆字节)或Gi(吉字节)</p>
+                            <label for="limitsMemory">内存限制 (例如: 256Mi)</label>
+                            <input type="text" id="limitsMemory" placeholder="例如：256Mi" value="256Mi" pattern="^[0-9]+(Mi|Gi)$">
+                            <small class="form-note">可以是Mi(兆字节)或Gi(吉字节)</small>
                         </div>
                         <div class="form-group">
-                            <label for="requestsCpu">CPU请求</label>
-                            <input type="text" id="requestsCpu" placeholder="例如：100m" value="100m">
-                            <p class="field-desc">可以是m(千分之一核)或直接的核心数</p>
+                            <label for="requestsCpu">CPU请求 (例如: 100m)</label>
+                            <input type="text" id="requestsCpu" placeholder="例如：100m" value="100m" pattern="^[0-9]+m?$">
+                            <small class="form-note">可以是m(千分之一核)或直接的核心数</small>
                         </div>
                         <div class="form-group">
-                            <label for="requestsMemory">内存请求</label>
-                            <input type="text" id="requestsMemory" placeholder="例如：128Mi" value="128Mi">
-                            <p class="field-desc">可以是Mi(兆字节)或Gi(吉字节)</p>
+                            <label for="requestsMemory">内存请求 (例如: 128Mi)</label>
+                            <input type="text" id="requestsMemory" placeholder="例如：128Mi" value="128Mi" pattern="^[0-9]+(Mi|Gi)$">
+                            <small class="form-note">可以是Mi(兆字节)或Gi(吉字节)</small>
                         </div>
                     </div>
                     
@@ -185,9 +202,9 @@
                                 </select>
                             </div>
                             <div class="form-group">
-                                <label for="size">存储大小</label>
-                                <input type="text" id="size" placeholder="例如：1Gi" value="1Gi">
-                                <p class="field-desc">格式为数字+单位(Mi,Gi,Ti)</p>
+                                <label for="size">存储大小 (例如: 1Gi)</label>
+                                <input type="text" id="size" placeholder="例如：1Gi" value="1Gi" pattern="^[0-9]+(Mi|Gi|Ti)$">
+                                <small class="form-note">可以是Mi/Gi/Ti单位</small>
                             </div>
                             <div class="form-group">
                                 <label for="storageClass">存储类名称</label>
@@ -205,10 +222,22 @@
                     <div id="env-container">
                         <!-- 动态添加的环境变量输入框将显示在这里 -->
                         <div class="env-row">
-                            <input type="text" class="env-name" placeholder="环境变量名称" value="APP_MODE">
-                            <input type="text" class="env-value" placeholder="环境变量值" value="production">
-                            <input type="text" class="env-title" placeholder="变量中文名称" value="运行模式">
-                            <input type="text" class="env-desc" placeholder="变量描述" value="应用程序运行模式">
+                            <div class="form-group env-title">
+                                <label>环境变量中文名称</label>
+                                <input type="text" class="env-title-input" placeholder="例如：数据库名" value="应用模式">
+                            </div>
+                            <div class="form-group env-desc">
+                                <label>环境变量描述</label>
+                                <input type="text" class="env-desc-input" placeholder="例如：MySQL数据库名称" value="应用运行的模式">
+                            </div>
+                            <div class="form-group env-name">
+                                <label>变量名称</label>
+                                <input type="text" class="env-name-input" placeholder="例如：MYSQL_DATABASE" value="APP_MODE">
+                            </div>
+                            <div class="form-group env-value">
+                                <label>变量值</label>
+                                <input type="text" class="env-value-input" placeholder="环境变量值" value="production">
+                            </div>
                             <button type="button" class="remove-env">删除</button>
                         </div>
                     </div>
@@ -241,8 +270,8 @@
                     </div>
                     
                     <div class="action-buttons">
-                        <button id="download-btn">下载Helm Chart文件包</button>
-                        <button id="reset-btn">重置表单</button>
+                        <button id="download-btn" class="cloud-button primary">下载Helm Chart文件包</button>
+                        <button id="reset-btn" class="cloud-button secondary">重置表单</button>
                     </div>
                 </div>
             </div>

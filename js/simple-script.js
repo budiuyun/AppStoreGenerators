@@ -56,6 +56,47 @@ document.addEventListener('DOMContentLoaded', function() {
         persistenceSettings.style.display = persistenceEnabled.checked ? 'block' : 'none';
     });
     
+    // 添加端口
+    const addPortBtn = document.getElementById('add-port');
+    const portContainer = document.getElementById('service-ports-container');
+    
+    addPortBtn.addEventListener('click', () => {
+        const portRow = document.createElement('div');
+        portRow.className = 'service-port-row';
+        
+        portRow.innerHTML = `
+            <div class="form-group port-name">
+                <label>端口名称</label>
+                <input type="text" class="port-name-input" placeholder="例如：http">
+            </div>
+            <div class="form-group port-number">
+                <label>端口号</label>
+                <input type="number" class="port-number-input" min="1" max="65535" value="80">
+            </div>
+            <button type="button" class="remove-port">删除</button>
+        `;
+        
+        portContainer.appendChild(portRow);
+        
+        // 添加删除端口的事件监听
+        const removeBtn = portRow.querySelector('.remove-port');
+        removeBtn.addEventListener('click', () => {
+            portRow.remove();
+        });
+    });
+    
+    // 初始化删除端口按钮
+    document.querySelectorAll('.remove-port').forEach(btn => {
+        btn.addEventListener('click', function() {
+            // 如果只有一个端口，不允许删除
+            if (document.querySelectorAll('.service-port-row').length <= 1) {
+                alert('至少需要一个服务端口！');
+                return;
+            }
+            this.closest('.service-port-row').remove();
+        });
+    });
+    
     // 添加环境变量
     const addEnvBtn = document.getElementById('add-env');
     const envContainer = document.getElementById('env-container');
@@ -65,8 +106,22 @@ document.addEventListener('DOMContentLoaded', function() {
         envRow.className = 'env-row';
         
         envRow.innerHTML = `
-            <input type="text" class="env-name" placeholder="环境变量名称">
-            <input type="text" class="env-value" placeholder="环境变量值">
+            <div class="form-group env-title">
+                <label>环境变量中文名称</label>
+                <input type="text" class="env-title-input" placeholder="例如：数据库名">
+            </div>
+            <div class="form-group env-desc">
+                <label>环境变量描述</label>
+                <input type="text" class="env-desc-input" placeholder="例如：MySQL数据库名称">
+            </div>
+            <div class="form-group env-name">
+                <label>变量名称</label>
+                <input type="text" class="env-name-input" placeholder="例如：MYSQL_DATABASE">
+            </div>
+            <div class="form-group env-value">
+                <label>变量值</label>
+                <input type="text" class="env-value-input" placeholder="环境变量值">
+            </div>
             <button type="button" class="remove-env">删除</button>
         `;
         
@@ -82,7 +137,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // 初始化删除环境变量按钮
     document.querySelectorAll('.remove-env').forEach(btn => {
         btn.addEventListener('click', () => {
-            btn.parentElement.remove();
+            btn.closest('.env-row').remove();
         });
     });
     
@@ -98,6 +153,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function updatePreviews() {
         document.getElementById('preview-chart').textContent = generateChartYaml();
         document.getElementById('preview-values').textContent = generateValuesYaml();
+        document.getElementById('preview-schema').textContent = generateValuesSchemaJson();
         document.getElementById('preview-deployment').textContent = generateDeploymentYaml();
         document.getElementById('preview-service').textContent = generateServiceYaml();
         document.getElementById('preview-pvc').textContent = generatePvcYaml();
@@ -109,13 +165,25 @@ document.addEventListener('DOMContentLoaded', function() {
         const networkEnabled = document.getElementById('networkEnabled').checked;
         const persistenceEnabled = document.getElementById('persistenceEnabled').checked;
         
+        // 收集服务端口
+        const servicePorts = [];
+        document.querySelectorAll('.service-port-row').forEach(row => {
+            const name = row.querySelector('.port-name-input').value.trim();
+            const port = parseInt(row.querySelector('.port-number-input').value);
+            if (name && !isNaN(port)) {
+                servicePorts.push({ name, port });
+            }
+        });
+        
         // 收集环境变量
         const envVars = [];
         document.querySelectorAll('.env-row').forEach(row => {
-            const name = row.querySelector('.env-name').value.trim();
-            const value = row.querySelector('.env-value').value.trim();
+            const title = row.querySelector('.env-title-input').value.trim();
+            const description = row.querySelector('.env-desc-input').value.trim();
+            const name = row.querySelector('.env-name-input').value.trim();
+            const value = row.querySelector('.env-value-input').value.trim();
             if (name) {
-                envVars.push({ name, value });
+                envVars.push({ title, description, name, value });
             }
         });
         
@@ -138,7 +206,7 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             service: {
                 type: document.getElementById('serviceType').value,
-                port: parseInt(document.getElementById('servicePort').value)
+                ports: servicePorts
             },
             networkLimits: {
                 enabled: networkEnabled,
@@ -211,6 +279,28 @@ document.addEventListener('DOMContentLoaded', function() {
             return false;
         }
         
+        // 验证端口配置
+        if (formData.service.ports.length === 0) {
+            alert('请至少添加一个服务端口');
+            return false;
+        }
+        
+        // 验证网络限制格式
+        if (formData.networkLimits.enabled) {
+            const egressPattern = /^[0-9]+[KMG]$/;
+            const ingressPattern = /^[0-9]+[KMG]$/;
+            
+            if (!egressPattern.test(formData.networkLimits.egress)) {
+                alert('出站带宽限制格式不正确，应为数字+K/M/G，例如1M');
+                return false;
+            }
+            
+            if (!ingressPattern.test(formData.networkLimits.ingress)) {
+                alert('入站带宽限制格式不正确，应为数字+K/M/G，例如1M');
+                return false;
+            }
+        }
+        
         return true;
     }
     
@@ -245,21 +335,34 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const values = {
             replicaCount: 1,
-            image: formData.image,
-            service: formData.service,
+            image: {
+                imageRegistry: formData.image.imageRegistry,
+                repository: formData.image.repository,
+                tag: formData.image.tag,
+                pullPolicy: formData.image.pullPolicy
+            },
+            service: {
+                type: formData.service.type,
+                ports: formData.service.ports.reduce((obj, port) => {
+                    obj[port.name] = port.port;
+                    return obj;
+                }, {})
+            },
             networkLimits: formData.networkLimits,
             resources: formData.resources,
             persistence: formData.persistence
         };
         
-        // 处理环境变量 - 这里一定要使用env1, env2这种格式
+        // 处理环境变量 - 使用env1, env2这种格式
         if (formData.envVars.length > 0) {
             values.env = {};
             formData.envVars.forEach((env, index) => {
                 // 确保使用env1, env2, env3...的格式
                 values.env[`env${index + 1}`] = {
                     name: env.name,
-                    value: env.value
+                    value: env.value,
+                    description: env.description || '',
+                    title: env.title || `环境变量${index + 1}`
                 };
             });
         }
@@ -267,9 +370,269 @@ document.addEventListener('DOMContentLoaded', function() {
         return jsyaml.dump(values);
     }
     
+    // 生成values.schema.json
+    function generateValuesSchemaJson() {
+        const formData = getFormData();
+        
+        // 构建schema对象
+        const schema = {
+            "$schema": "https://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "title": `${formData.name} Helm Chart 配置`,
+            "required": [
+                "replicaCount",
+                "image",
+                "service",
+                "networkLimits",
+                "resources"
+            ],
+            "properties": {
+                "replicaCount": {
+                    "type": "integer",
+                    "title": "副本数量",
+                    "description": "Deployment的副本数量",
+                    "default": 1,
+                    "minimum": 1
+                },
+                "image": {
+                    "type": "object",
+                    "title": "容器镜像",
+                    "required": ["repository", "tag", "pullPolicy"],
+                    "properties": {
+                        "imageRegistry": {
+                            "type": "string",
+                            "title": "镜像仓库地址",
+                            "description": "容器镜像的仓库地址",
+                            "default": "docker.io"
+                        },
+                        "repository": {
+                            "type": "string",
+                            "title": "镜像名称",
+                            "description": "容器镜像的名称"
+                        },
+                        "tag": {
+                            "type": "string",
+                            "title": "镜像标签",
+                            "description": "容器镜像的标签",
+                            "default": "latest"
+                        },
+                        "pullPolicy": {
+                            "type": "string",
+                            "title": "镜像拉取策略",
+                            "description": "镜像拉取策略，只能是IfNotPresent",
+                            "enum": ["IfNotPresent"],
+                            "default": "IfNotPresent"
+                        }
+                    }
+                },
+                "service": {
+                    "type": "object",
+                    "title": "服务配置",
+                    "required": ["type", "ports"],
+                    "properties": {
+                        "type": {
+                            "type": "string",
+                            "title": "服务类型",
+                            "description": "Kubernetes服务类型",
+                            "enum": ["ClusterIP"],
+                            "default": "ClusterIP"
+                        },
+                        "ports": {
+                            "type": "object",
+                            "title": "服务端口配置",
+                            "description": "服务暴露的端口配置",
+                            "additionalProperties": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 65535
+                            }
+                        }
+                    }
+                },
+                "networkLimits": {
+                    "type": "object",
+                    "title": "网络带宽限制",
+                    "required": ["enabled", "egress", "ingress"],
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "title": "启用网络带宽限制",
+                            "description": "是否启用网络带宽限制",
+                            "default": true
+                        },
+                        "egress": {
+                            "type": "string",
+                            "title": "出站带宽限制",
+                            "description": "容器出站带宽限制，格式为数字+K/M/G，例如1M",
+                            "default": "1M",
+                            "pattern": "^[0-9]+[KMG]$"
+                        },
+                        "ingress": {
+                            "type": "string",
+                            "title": "入站带宽限制",
+                            "description": "容器入站带宽限制，格式为数字+K/M/G，例如1M",
+                            "default": "1M",
+                            "pattern": "^[0-9]+[KMG]$"
+                        }
+                    }
+                },
+                "resources": {
+                    "type": "object",
+                    "title": "资源配置",
+                    "required": ["limits", "requests"],
+                    "properties": {
+                        "limits": {
+                            "type": "object",
+                            "title": "资源限制",
+                            "required": ["cpu", "memory"],
+                            "properties": {
+                                "cpu": {
+                                    "type": "string",
+                                    "title": "CPU限制",
+                                    "description": "CPU资源限制，可以是m或核心数",
+                                    "default": "200m"
+                                },
+                                "memory": {
+                                    "type": "string",
+                                    "title": "内存限制",
+                                    "description": "内存资源限制，可以是Mi或Gi",
+                                    "default": "256Mi"
+                                }
+                            }
+                        },
+                        "requests": {
+                            "type": "object",
+                            "title": "资源请求",
+                            "required": ["cpu", "memory"],
+                            "properties": {
+                                "cpu": {
+                                    "type": "string",
+                                    "title": "CPU请求",
+                                    "description": "CPU资源请求，可以是m或核心数",
+                                    "default": "100m"
+                                },
+                                "memory": {
+                                    "type": "string",
+                                    "title": "内存请求",
+                                    "description": "内存资源请求，可以是Mi或Gi",
+                                    "default": "128Mi"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+        
+        // 添加持久化存储配置
+        schema.properties.persistence = {
+            "type": "object",
+            "title": "持久化存储",
+            "required": ["enabled"],
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "title": "启用持久化存储",
+                    "description": "是否启用持久化存储",
+                    "default": true
+                }
+            }
+        };
+        
+        // 如果启用了持久化存储，添加相关配置
+        if (formData.persistence.enabled) {
+            schema.properties.persistence.properties.path = {
+                "type": "string",
+                "title": "数据挂载路径",
+                "description": "容器内挂载持久化存储的路径",
+                "default": "/data"
+            };
+            
+            schema.properties.persistence.properties.accessMode = {
+                "type": "string",
+                "title": "存储访问模式",
+                "description": "持久化存储的访问模式",
+                "enum": ["ReadWriteOnce", "ReadOnlyMany", "ReadWriteMany"],
+                "default": "ReadWriteOnce"
+            };
+            
+            schema.properties.persistence.properties.size = {
+                "type": "string",
+                "title": "存储大小",
+                "description": "持久化存储的大小，例如1Gi",
+                "default": "1Gi"
+            };
+            
+            schema.properties.persistence.properties.storageClass = {
+                "type": "string",
+                "title": "存储类名称",
+                "description": "Kubernetes存储类的名称",
+                "default": "local"
+            };
+        }
+        
+        // 添加环境变量配置
+        if (formData.envVars.length > 0) {
+            schema.properties.env = {
+                "type": "object",
+                "title": "环境变量",
+                "description": "应用程序环境变量配置"
+            };
+            
+            // 为每个环境变量创建schema属性
+            schema.properties.env.properties = {};
+            formData.envVars.forEach((env, index) => {
+                const envKey = `env${index + 1}`;
+                schema.properties.env.properties[envKey] = {
+                    "type": "object",
+                    "title": env.title || `环境变量${index + 1}`,
+                    "description": env.description || `环境变量${index + 1}的配置`,
+                    "required": ["name", "value"],
+                    "properties": {
+                        "name": {
+                            "type": "string",
+                            "title": "变量名称",
+                            "description": "环境变量的名称",
+                            "default": env.name
+                        },
+                        "value": {
+                            "type": "string",
+                            "title": "变量值",
+                            "description": "环境变量的值",
+                            "default": env.value
+                        },
+                        "title": {
+                            "type": "string",
+                            "title": "中文名称",
+                            "description": "环境变量的中文名称",
+                            "default": env.title
+                        },
+                        "description": {
+                            "type": "string",
+                            "title": "描述",
+                            "description": "环境变量的详细描述",
+                            "default": env.description
+                        }
+                    }
+                };
+            });
+        }
+        
+        return JSON.stringify(schema, null, 2);
+    }
+    
     // 生成deployment.yaml
     function generateDeploymentYaml() {
         const formData = getFormData();
+        
+        // 生成容器端口配置
+        let containerPortsYaml = '';
+        formData.service.ports.forEach(port => {
+            containerPortsYaml += `
+            - name: ${port.name}
+              containerPort: ${port.port}
+              protocol: TCP`;
+        });
         
         return `apiVersion: apps/v1
 kind: Deployment
@@ -299,10 +662,7 @@ spec:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.imageRegistry }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          ports:
-            - name: http
-              containerPort: ${formData.service.port}
-              protocol: TCP
+          ports:${containerPortsYaml}
           {{- if .Values.env }}
           env:
             {{- if kindIs "map" .Values.env }}
@@ -350,10 +710,12 @@ metadata:
 spec:
   type: {{ .Values.service.type }}
   ports:
-    - port: {{ .Values.service.port }}
-      targetPort: http
+    {{- range $name, $port := .Values.service.ports }}
+    - port: {{ $port }}
+      targetPort: {{ $name }}
       protocol: TCP
-      name: http
+      name: {{ $name }}
+    {{- end }}
   selector:
     {{- include "${formData.name}.selectorLabels" . | nindent 4 }}`;
     }
@@ -452,6 +814,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
         // 添加文件
         chartDir.file('Chart.yaml', generateChartYaml());
         chartDir.file('values.yaml', generateValuesYaml());
+        chartDir.file('values.schema.json', generateValuesSchemaJson());
         templatesDir.file('deployment.yaml', generateDeploymentYaml());
         templatesDir.file('service.yaml', generateServiceYaml());
         templatesDir.file('pvc.yaml', generatePvcYaml());
@@ -471,7 +834,7 @@ ${formData.description}
 | image.tag | 镜像标签 | \`${formData.image.tag}\` |
 | image.pullPolicy | 镜像拉取策略 | \`${formData.image.pullPolicy}\` |
 | service.type | 服务类型 | \`${formData.service.type}\` |
-| service.port | 服务端口 | \`${formData.service.port}\` |
+| service.ports | 服务端口 | 参见values.yaml |
 | resources | 资源限制/请求 | 参见values.yaml |
 | persistence.enabled | 是否启用持久化存储 | \`${formData.persistence.enabled}\` |
 | persistence.size | 存储大小 | \`${formData.persistence.size}\` |
@@ -516,9 +879,33 @@ helm install my-release ./charts/${formData.name}
         document.getElementById('tag').value = 'latest';
         document.getElementById('pullPolicy').value = 'IfNotPresent';
         
-        // 服务配置
-        document.getElementById('serviceType').value = 'ClusterIP';
-        document.getElementById('servicePort').value = '80';
+        // 服务配置 - 重置为单个端口
+        const portContainer = document.getElementById('service-ports-container');
+        portContainer.innerHTML = `
+            <div class="service-port-row">
+                <div class="form-group port-name">
+                    <label>端口名称</label>
+                    <input type="text" class="port-name-input" placeholder="例如：http" value="http">
+                </div>
+                <div class="form-group port-number">
+                    <label>端口号</label>
+                    <input type="number" class="port-number-input" min="1" max="65535" value="80">
+                </div>
+                <button type="button" class="remove-port">删除</button>
+            </div>
+        `;
+        
+        // 重新绑定删除端口按钮事件
+        document.querySelectorAll('.remove-port').forEach(btn => {
+            btn.addEventListener('click', function() {
+                // 如果只有一个端口，不允许删除
+                if (document.querySelectorAll('.service-port-row').length <= 1) {
+                    alert('至少需要一个服务端口！');
+                    return;
+                }
+                this.closest('.service-port-row').remove();
+            });
+        });
         
         // 网络带宽限制
         document.getElementById('networkEnabled').checked = true;
@@ -542,18 +929,35 @@ helm install my-release ./charts/${formData.name}
         const envContainer = document.getElementById('env-container');
         envContainer.innerHTML = `
             <div class="env-row">
-                <input type="text" class="env-name" placeholder="环境变量名称" value="APP_MODE">
-                <input type="text" class="env-value" placeholder="环境变量值" value="production">
+                <div class="form-group env-title">
+                    <label>环境变量中文名称</label>
+                    <input type="text" class="env-title-input" placeholder="例如：数据库名" value="应用模式">
+                </div>
+                <div class="form-group env-desc">
+                    <label>环境变量描述</label>
+                    <input type="text" class="env-desc-input" placeholder="例如：MySQL数据库名称" value="应用运行的模式">
+                </div>
+                <div class="form-group env-name">
+                    <label>变量名称</label>
+                    <input type="text" class="env-name-input" placeholder="例如：MYSQL_DATABASE" value="APP_MODE">
+                </div>
+                <div class="form-group env-value">
+                    <label>变量值</label>
+                    <input type="text" class="env-value-input" placeholder="环境变量值" value="production">
+                </div>
                 <button type="button" class="remove-env">删除</button>
             </div>
         `;
         
-        // 重新绑定删除按钮事件
+        // 重新绑定删除环境变量按钮事件
         document.querySelectorAll('.remove-env').forEach(btn => {
             btn.addEventListener('click', () => {
-                btn.parentElement.remove();
+                btn.closest('.env-row').remove();
             });
         });
+        
+        // 更新预览内容
+        updatePreviews();
         
         alert('表单已重置');
     }
