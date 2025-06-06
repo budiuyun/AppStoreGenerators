@@ -366,8 +366,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const formData = getFormData();
 
         const values = {
-            replicaCount: 1,
             workloadType: formData.workloadType,
+            replicaCount: 1,
             image: {
                 imageRegistry: formData.image.imageRegistry,
                 repository: formData.image.repository,
@@ -409,31 +409,31 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // 构建schema对象
         const schema = {
-            "$schema": "https://json-schema.org/draft-07/schema#",
+            "$schema": "http://json-schema.org/schema#",
             "type": "object",
             "title": `${formData.name} Helm Chart 配置`,
             "required": [
-                "replicaCount",
                 "workloadType",
+                "replicaCount",
                 "image",
                 "service",
                 "networkLimits",
                 "resources"
             ],
             "properties": {
-                "replicaCount": {
-                    "type": "integer",
-                    "title": "副本数量",
-                    "description": "Deployment的副本数量",
-                    "default": 1,
-                    "minimum": 1
-                },
                 "workloadType": {
                     "type": "string",
                     "title": "工作负载类型",
                     "description": "指定部署为有状态集(StatefulSet)或无状态部署(Deployment)",
                     "enum": ["Deployment", "StatefulSet"],
                     "default": formData.workloadType
+                },
+                "replicaCount": {
+                    "type": "integer",
+                    "title": "副本数量",
+                    "description": "Deployment的副本数量",
+                    "default": 1,
+                    "minimum": 1
                 },
                 "image": {
                     "type": "object",
@@ -854,18 +854,10 @@ ${portsConfig}
               mountPath: {{ .Values.persistence.path }}
           {{- end }}
       {{- if .Values.persistence.enabled }}
-      volumeClaimTemplates:
-        - metadata:
-            name: data
-          spec:
-            accessModes:
-              - {{ .Values.persistence.accessMode }}
-            {{- if .Values.persistence.storageClass }}
-            storageClassName: {{ .Values.persistence.storageClass }}
-            {{- end }}
-            resources:
-              requests:
-                storage: {{ .Values.persistence.size }}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "${formData.name}.fullname" . }}-pvc
       {{- end }}`;
     }
 
@@ -910,7 +902,7 @@ spec:
     requests:
       storage: {{ .Values.persistence.size }}
   {{- if .Values.persistence.storageClass }}
-  storageClassName: {{ .Values.persistence.storageClass }}
+  storageClassName: {{ .Values.persistence.storageClass | quote }}
   {{- end }}
 {{- end }}`;
     }
@@ -995,8 +987,8 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 
         templatesDir.file('service.yaml', generateServiceYaml());
 
-        // 只有在Deployment工作负载时才需要单独的PVC文件
-        if (formData.workloadType === 'Deployment' && formData.persistence.enabled) {
+        // 无论工作负载类型如何，只要启用了持久化存储，就生成pvc.yaml
+        if (formData.persistence.enabled) {
             templatesDir.file('pvc.yaml', generatePvcYaml());
         }
 
@@ -1025,6 +1017,16 @@ ${formData.workloadType === 'StatefulSet' ? '- StatefulSet适合有状态应用�
 | service.type | 服务类型 | \`${formData.service.type}\` |
 | persistence.enabled | 是否启用持久化存储 | \`${formData.persistence.enabled}\` |
 | persistence.size | 存储大小 | \`${formData.persistence.size}\` |
+${formData.envVars.length > 0 ? '| env | 环境变量配置 | 见下文 |\n' : ''}
+
+${formData.envVars.length > 0 ? `## 环境变量
+
+应用程序支持以下环境变量配置：
+
+| 环境变量 | 描述 | 默认值 |
+|---------|------|--------|
+${formData.envVars.map(env => `| ${env.name} | ${env.description || env.title} | \`${env.value}\` |`).join('\n')}
+` : ''}
 
 ## 安装方法
 
