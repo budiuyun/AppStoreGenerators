@@ -876,7 +876,7 @@ spec:
   ports:
     {{- range $name, $port := .Values.service.ports }}
     - port: {{ $port }}
-      targetPort: {{ $name }}
+      targetPort: {{ $port }}
       protocol: TCP
       name: {{ $name }}
     {{- end }}
