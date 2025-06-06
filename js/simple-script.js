@@ -692,13 +692,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // 生成Deployment YAML
     function generateDeploymentYaml(formData) {
-        // 端口配置
-        const portsConfig = formData.service.ports.map(port =>
-            `            - name: ${port.name}
-              containerPort: ${port.port}
-              protocol: TCP`
-        ).join('\n');
-
         return `apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -728,7 +721,11 @@ spec:
           image: "{{ .Values.image.imageRegistry }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
-${portsConfig}
+            {{- range $name, $port := .Values.service.ports }}
+            - name: {{ $name }}
+              containerPort: {{ $port }}
+              protocol: TCP
+            {{- end }}
           {{- if .Values.env }}
           env:
             {{- if kindIs "map" .Values.env }}
@@ -777,13 +774,6 @@ ${portsConfig}
 
     // 生成StatefulSet YAML
     function generateStatefulSetYaml(formData) {
-        // 端口配置
-        const portsConfig = formData.service.ports.map(port =>
-            `            - name: ${port.name}
-              containerPort: ${port.port}
-              protocol: TCP`
-        ).join('\n');
-
         return `apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -814,7 +804,11 @@ spec:
           image: "{{ .Values.image.imageRegistry }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
-${portsConfig}
+            {{- range $name, $port := .Values.service.ports }}
+            - name: {{ $name }}
+              containerPort: {{ $port }}
+              protocol: TCP
+            {{- end }}
           {{- if .Values.env }}
           env:
             {{- if kindIs "map" .Values.env }}
@@ -876,7 +870,7 @@ spec:
   ports:
     {{- range $name, $port := .Values.service.ports }}
     - port: {{ $port }}
-      targetPort: {{ $port }}
+      targetPort: {{ $name }}
       protocol: TCP
       name: {{ $name }}
     {{- end }}
