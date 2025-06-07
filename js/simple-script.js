@@ -1198,7 +1198,7 @@ ${portsYaml}
               memory: {{ .Values.resources.limits.memory | quote }}
               {{- end }}
               {{- if hasKey .Values.resources.limits "ephemeral-storage" }}
-              "ephemeral-storage": {{ .Values.resources.limits.ephemeral-storage | quote }}
+              ephemeral-storage: {{ index .Values.resources.limits "ephemeral-storage" | quote }}
               {{- end }}
             requests:
               {{- if .Values.resources.requests.cpu }}
@@ -1208,7 +1208,7 @@ ${portsYaml}
               memory: {{ .Values.resources.requests.memory | quote }}
               {{- end }}
               {{- if hasKey .Values.resources.requests "ephemeral-storage" }}
-              "ephemeral-storage": {{ .Values.resources.requests.ephemeral-storage | quote }}
+              ephemeral-storage: {{ index .Values.resources.requests "ephemeral-storage" | quote }}
               {{- end }}
           {{- if .Values.persistence.enabled }}
           volumeMounts:
@@ -1324,7 +1324,7 @@ ${portsYaml}
               memory: {{ .Values.resources.limits.memory | quote }}
               {{- end }}
               {{- if hasKey .Values.resources.limits "ephemeral-storage" }}
-              "ephemeral-storage": {{ .Values.resources.limits.ephemeral-storage | quote }}
+              ephemeral-storage: {{ index .Values.resources.limits "ephemeral-storage" | quote }}
               {{- end }}
             requests:
               {{- if .Values.resources.requests.cpu }}
@@ -1334,7 +1334,7 @@ ${portsYaml}
               memory: {{ .Values.resources.requests.memory | quote }}
               {{- end }}
               {{- if hasKey .Values.resources.requests "ephemeral-storage" }}
-              "ephemeral-storage": {{ .Values.resources.requests.ephemeral-storage | quote }}
+              ephemeral-storage: {{ index .Values.resources.requests "ephemeral-storage" | quote }}
               {{- end }}
           {{- if .Values.persistence.enabled }}
           volumeMounts:
