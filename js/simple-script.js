@@ -22,6 +22,240 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
+    // 导入JSON功能
+    const importJsonBtn = document.getElementById('import-json-btn');
+    const importJsonFile = document.getElementById('import-json-file');
+
+    importJsonBtn.addEventListener('click', () => {
+        if (!importJsonFile.files || importJsonFile.files.length === 0) {
+            alert('请先选择一个JSON文件');
+            return;
+        }
+
+        const file = importJsonFile.files[0];
+        const reader = new FileReader();
+
+        reader.onload = function (e) {
+            try {
+                const jsonData = JSON.parse(e.target.result);
+                fillFormFromJson(jsonData);
+                alert('JSON配置已成功导入');
+                // 更新预览
+                updatePreviews();
+            } catch (error) {
+                alert('JSON解析失败: ' + error.message);
+                console.error('JSON解析失败:', error);
+            }
+        };
+
+        reader.onerror = function () {
+            alert('读取文件失败');
+        };
+
+        reader.readAsText(file);
+    });
+
+    // 从JSON填充表单
+    function fillFormFromJson(data) {
+        // 基本信息
+        if (data.name) document.getElementById('name').value = data.name;
+        if (data.version) document.getElementById('version').value = data.version;
+        if (data.appVersion) document.getElementById('appVersion').value = data.appVersion;
+        if (data.description) document.getElementById('description').value = data.description;
+        if (data.icon) document.getElementById('icon').value = data.icon;
+
+        // 分类
+        if (data.category) {
+            const categorySelect = document.getElementById('category');
+            const customCategoryInput = document.getElementById('customCategory');
+
+            // 检查是否是预定义分类
+            const categories = Array.from(categorySelect.options).map(opt => opt.value);
+            if (categories.includes(data.category) && data.category !== 'custom') {
+                categorySelect.value = data.category;
+                customCategoryInput.style.display = 'none';
+            } else {
+                categorySelect.value = 'custom';
+                customCategoryInput.style.display = 'block';
+                customCategoryInput.value = data.category;
+            }
+        }
+
+        // 维护者信息
+        if (data.maintainer) {
+            if (data.maintainer.name) document.getElementById('maintainerName').value = data.maintainer.name;
+            if (data.maintainer.email) document.getElementById('maintainerEmail').value = data.maintainer.email;
+        }
+
+        // 工作负载类型
+        if (data.workloadType) document.getElementById('workloadType').value = data.workloadType;
+
+        // 镜像信息
+        if (data.image) {
+            if (data.image.imageRegistry) document.getElementById('imageRegistry').value = data.image.imageRegistry;
+            if (data.image.repository) document.getElementById('repository').value = data.image.repository;
+            if (data.image.tag) document.getElementById('tag').value = data.image.tag;
+            if (data.image.pullPolicy) document.getElementById('pullPolicy').value = data.image.pullPolicy;
+        }
+
+        // 服务配置
+        if (data.service) {
+            if (data.service.type) document.getElementById('serviceType').value = data.service.type;
+
+            // 清除现有端口
+            const portContainer = document.getElementById('service-ports-container');
+            portContainer.innerHTML = '';
+
+            // 添加端口
+            if (data.service.ports && Array.isArray(data.service.ports)) {
+                data.service.ports.forEach(port => {
+                    addPortRow(port.name, port.port);
+                });
+            } else if (data.service.ports && typeof data.service.ports === 'object') {
+                // 处理对象格式的端口
+                Object.entries(data.service.ports).forEach(([name, port]) => {
+                    addPortRow(name, port);
+                });
+            }
+
+            // 确保至少有一个端口
+            if (document.querySelectorAll('.service-port-row').length === 0) {
+                addPortRow('http', 80);
+            }
+        }
+
+        // 网络限制
+        if (data.networkLimits) {
+            if (data.networkLimits.enabled !== undefined) {
+                document.getElementById('networkEnabled').checked = data.networkLimits.enabled;
+            }
+            if (data.networkLimits.egress) document.getElementById('egress').value = data.networkLimits.egress;
+            if (data.networkLimits.ingress) document.getElementById('ingress').value = data.networkLimits.ingress;
+
+            // 显示/隐藏网络设置
+            document.querySelector('.network-settings').style.display =
+                document.getElementById('networkEnabled').checked ? 'block' : 'none';
+        }
+
+        // 资源限制
+        if (data.resources) {
+            if (data.resources.limits) {
+                if (data.resources.limits.cpu) document.getElementById('limitsCpu').value = data.resources.limits.cpu;
+                if (data.resources.limits.memory) document.getElementById('limitsMemory').value = data.resources.limits.memory;
+            }
+            if (data.resources.requests) {
+                if (data.resources.requests.cpu) document.getElementById('requestsCpu').value = data.resources.requests.cpu;
+                if (data.resources.requests.memory) document.getElementById('requestsMemory').value = data.resources.requests.memory;
+            }
+        }
+
+        // 持久化存储
+        if (data.persistence) {
+            if (data.persistence.enabled !== undefined) {
+                document.getElementById('persistenceEnabled').checked = data.persistence.enabled;
+            }
+            if (data.persistence.path) document.getElementById('path').value = data.persistence.path;
+            if (data.persistence.accessMode) document.getElementById('accessMode').value = data.persistence.accessMode;
+            if (data.persistence.size) document.getElementById('size').value = data.persistence.size;
+            if (data.persistence.storageClass) document.getElementById('storageClass').value = data.persistence.storageClass;
+
+            // 显示/隐藏持久化设置
+            document.querySelector('.persistence-settings').style.display =
+                document.getElementById('persistenceEnabled').checked ? 'block' : 'none';
+        }
+
+        // 环境变量
+        if (data.envVars && Array.isArray(data.envVars)) {
+            // 清除现有环境变量
+            const envContainer = document.getElementById('env-container');
+            envContainer.innerHTML = '';
+
+            // 添加环境变量
+            data.envVars.forEach(env => {
+                addEnvRow(env.title, env.description, env.name, env.value);
+            });
+        } else if (data.env) {
+            // 处理env对象格式
+            const envContainer = document.getElementById('env-container');
+            envContainer.innerHTML = '';
+
+            Object.values(data.env).forEach(env => {
+                addEnvRow(env.title, env.description, env.name, env.value);
+            });
+        }
+
+        // 确保至少有一个环境变量行
+        if (document.querySelectorAll('.env-row').length === 0) {
+            addEnvRow('应用模式', '应用运行的模式', 'APP_MODE', 'production');
+        }
+    }
+
+    // 辅助函数：添加端口行
+    function addPortRow(name, port) {
+        const portContainer = document.getElementById('service-ports-container');
+        const portRow = document.createElement('div');
+        portRow.className = 'service-port-row';
+
+        portRow.innerHTML = `
+            <div class="form-group port-name">
+                <label>端口名称</label>
+                <input type="text" class="port-name-input" placeholder="例如：http" value="${name || ''}">
+            </div>
+            <div class="form-group port-number">
+                <label>端口号</label>
+                <input type="number" class="port-number-input" min="1" max="65535" value="${port || 80}">
+            </div>
+            <button type="button" class="remove-port">删除</button>
+        `;
+
+        portContainer.appendChild(portRow);
+
+        // 添加删除端口的事件监听
+        const removeBtn = portRow.querySelector('.remove-port');
+        removeBtn.addEventListener('click', () => {
+            if (document.querySelectorAll('.service-port-row').length <= 1) {
+                alert('至少需要一个服务端口！');
+                return;
+            }
+            portRow.remove();
+        });
+    }
+
+    // 辅助函数：添加环境变量行
+    function addEnvRow(title, description, name, value) {
+        const envContainer = document.getElementById('env-container');
+        const envRow = document.createElement('div');
+        envRow.className = 'env-row';
+
+        envRow.innerHTML = `
+            <div class="form-group env-title">
+                <label>环境变量中文名称</label>
+                <input type="text" class="env-title-input" placeholder="例如：数据库名" value="${title || ''}">
+            </div>
+            <div class="form-group env-desc">
+                <label>环境变量描述</label>
+                <input type="text" class="env-desc-input" placeholder="例如：MySQL数据库名称" value="${description || ''}">
+            </div>
+            <div class="form-group env-name">
+                <label>变量名称</label>
+                <input type="text" class="env-name-input" placeholder="例如：MYSQL_DATABASE" value="${name || ''}">
+            </div>
+            <div class="form-group env-value">
+                <label>变量值</label>
+                <input type="text" class="env-value-input" placeholder="环境变量值" value="${value || ''}">
+            </div>
+            <button type="button" class="remove-env">删除</button>
+        `;
+
+        envContainer.appendChild(envRow);
+
+        // 添加删除环境变量的事件监听
+        const removeBtn = envRow.querySelector('.remove-env');
+        removeBtn.addEventListener('click', () => {
+            envRow.remove();
+        });
+    }
+
     // 预览标签页切换
     const previewTabs = document.querySelectorAll('.preview-tab');
     const previewContents = document.querySelectorAll('.preview-content pre');
@@ -144,6 +378,10 @@ document.addEventListener('DOMContentLoaded', function () {
     // 下载按钮
     const downloadBtn = document.getElementById('download-btn');
     downloadBtn.addEventListener('click', downloadAll);
+
+    // 导出JSON按钮
+    const exportJsonBtn = document.getElementById('export-json-btn');
+    exportJsonBtn.addEventListener('click', exportJson);
 
     // 重置按钮
     const resetBtn = document.getElementById('reset-btn');
@@ -1120,6 +1358,27 @@ helm install my-release ./${formData.name}
         }
 
         alert('表单已重置');
+    }
+
+    // 导出JSON配置
+    function exportJson() {
+        if (!validateForm()) {
+            return;
+        }
+
+        const formData = getFormData();
+        const jsonString = JSON.stringify(formData, null, 2);
+
+        // 创建下载链接
+        const blob = new Blob([jsonString], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${formData.name}-config.json`;
+        link.click();
+        URL.revokeObjectURL(url);
+
+        alert('JSON配置已成功导出');
     }
 
     // 初始化预览

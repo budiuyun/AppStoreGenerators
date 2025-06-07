@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,6 +9,7 @@
     <script src="https://unpkg.com/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
+
 <body>
     <header>
         <h1>不丢云应用生成器</h1>
@@ -28,6 +30,11 @@
                 <!-- 基本信息 -->
                 <div class="tab-pane active" id="basic">
                     <h2>基本信息</h2>
+                    <div class="import-json-section">
+                        <label for="import-json-file" class="import-json-label">导入JSON配置</label>
+                        <input type="file" id="import-json-file" accept=".json">
+                        <button type="button" id="import-json-btn" class="cloud-button secondary">导入JSON</button>
+                    </div>
                     <div class="form-group">
                         <label for="name">应用名称 *</label>
                         <input type="text" id="name" placeholder="例如：mysql" required>
@@ -81,7 +88,7 @@
                 <!-- 容器镜像 -->
                 <div class="tab-pane" id="image">
                     <h2>容器镜像</h2>
-                    
+
                     <div class="form-group">
                         <label for="workloadType">工作负载类型 *</label>
                         <select id="workloadType" required>
@@ -90,7 +97,7 @@
                         </select>
                         <small class="form-note">Deployment适用于无状态应用，StatefulSet适用于有状态应用（如数据库）</small>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="imageRegistry">镜像仓库地址 *</label>
                         <input type="text" id="imageRegistry" value="docker.io" required>
@@ -125,11 +132,11 @@
                         </select>
                         <small class="form-note">注意: 服务类型必须是ClusterIP</small>
                     </div>
-                    
+
                     <div class="service-ports-section">
                         <h3>服务端口配置</h3>
                         <p class="info">可配置多个服务端口，每个端口需指定名称和端口号</p>
-                        
+
                         <div id="service-ports-container">
                             <!-- 默认端口配置行 -->
                             <div class="service-port-row">
@@ -144,7 +151,7 @@
                                 <button type="button" class="remove-port">删除</button>
                             </div>
                         </div>
-                        
+
                         <button type="button" id="add-port">添加端口</button>
                     </div>
                 </div>
@@ -152,7 +159,7 @@
                 <!-- 资源与存储 -->
                 <div class="tab-pane" id="resources">
                     <h2>资源与存储</h2>
-                    
+
                     <div class="section">
                         <h3>网络带宽限制</h3>
                         <div class="form-group disabled-group">
@@ -173,7 +180,7 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="section">
                         <h3>资源配置</h3>
                         <div class="form-group">
@@ -183,7 +190,8 @@
                         </div>
                         <div class="form-group">
                             <label for="limitsMemory">内存限制 (例如: 256Mi)</label>
-                            <input type="text" id="limitsMemory" placeholder="例如：256Mi" value="256Mi" pattern="^[0-9]+(Mi|Gi)$">
+                            <input type="text" id="limitsMemory" placeholder="例如：256Mi" value="256Mi"
+                                pattern="^[0-9]+(Mi|Gi)$">
                             <small class="form-note">可以是Mi(兆字节)或Gi(吉字节)</small>
                         </div>
                         <div class="form-group">
@@ -193,11 +201,12 @@
                         </div>
                         <div class="form-group">
                             <label for="requestsMemory">内存请求 (例如: 128Mi)</label>
-                            <input type="text" id="requestsMemory" placeholder="例如：128Mi" value="128Mi" pattern="^[0-9]+(Mi|Gi)$">
+                            <input type="text" id="requestsMemory" placeholder="例如：128Mi" value="128Mi"
+                                pattern="^[0-9]+(Mi|Gi)$">
                             <small class="form-note">可以是Mi(兆字节)或Gi(吉字节)</small>
                         </div>
                     </div>
-                    
+
                     <div class="section">
                         <h3>持久化存储</h3>
                         <div class="form-group">
@@ -219,7 +228,8 @@
                             </div>
                             <div class="form-group">
                                 <label for="size">存储大小 (例如: 1Gi)</label>
-                                <input type="text" id="size" placeholder="例如：1Gi" value="1Gi" pattern="^[0-9]+(Mi|Gi|Ti)$">
+                                <input type="text" id="size" placeholder="例如：1Gi" value="1Gi"
+                                    pattern="^[0-9]+(Mi|Gi|Ti)$">
                                 <small class="form-note">可以是Mi/Gi/Ti单位</small>
                             </div>
                             <div class="form-group">
@@ -234,7 +244,7 @@
                 <div class="tab-pane" id="env">
                     <h2>环境变量</h2>
                     <p class="info">添加应用程序所需的环境变量，系统会自动生成env1、env2等格式的环境变量配置。</p>
-                    
+
                     <div id="env-container">
                         <!-- 动态添加的环境变量输入框将显示在这里 -->
                         <div class="env-row">
@@ -248,7 +258,8 @@
                             </div>
                             <div class="form-group env-name">
                                 <label>变量名称</label>
-                                <input type="text" class="env-name-input" placeholder="例如：MYSQL_DATABASE" value="APP_MODE">
+                                <input type="text" class="env-name-input" placeholder="例如：MYSQL_DATABASE"
+                                    value="APP_MODE">
                             </div>
                             <div class="form-group env-value">
                                 <label>变量值</label>
@@ -257,14 +268,14 @@
                             <button type="button" class="remove-env">删除</button>
                         </div>
                     </div>
-                    
+
                     <button type="button" id="add-env">添加环境变量</button>
                 </div>
 
                 <!-- 预览生成 -->
                 <div class="tab-pane" id="preview">
                     <h2>预览生成</h2>
-                    
+
                     <div class="preview-tabs">
                         <button class="preview-tab active" data-preview="chart">Chart.yaml</button>
                         <button class="preview-tab" data-preview="values">values.yaml</button>
@@ -274,7 +285,7 @@
                         <button class="preview-tab" data-preview="pvc">pvc.yaml</button>
                         <button class="preview-tab" data-preview="helpers">_helpers.tpl</button>
                     </div>
-                    
+
                     <div class="preview-content">
                         <pre id="preview-chart" class="active"></pre>
                         <pre id="preview-values"></pre>
@@ -284,9 +295,10 @@
                         <pre id="preview-pvc"></pre>
                         <pre id="preview-helpers"></pre>
                     </div>
-                    
+
                     <div class="action-buttons">
                         <button id="download-btn" class="cloud-button primary">下载Helm Chart文件包</button>
+                        <button id="export-json-btn" class="cloud-button secondary">导出JSON配置</button>
                         <button id="reset-btn" class="cloud-button secondary">重置表单</button>
                     </div>
                 </div>
@@ -295,10 +307,12 @@
     </main>
 
     <footer>
-        <p>© 2023 不丢云应用生成器 | <a href="https://github.com/yourusername/AppStoreGenerators-" target="_blank">GitHub</a></p>
+        <p>© 2023 不丢云应用生成器 | <a href="https://github.com/yourusername/AppStoreGenerators-" target="_blank">GitHub</a>
+        </p>
         <p class="footer-note">基于开源技术构建，适用于Kubernetes环境下的应用部署</p>
     </footer>
 
     <script src="js/simple-script.js"></script>
 </body>
-</html> 
+
+</html>
