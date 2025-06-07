@@ -1073,6 +1073,51 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // 生成Deployment YAML
     function generateDeploymentYaml(formData) {
+        // 获取所有端口信息
+        const ports = [];
+
+        if (formData.service.ports.length > 0) {
+            // 数组格式的端口
+            formData.service.ports.forEach(port => {
+                ports.push({
+                    name: port.name,
+                    port: port.port
+                });
+            });
+        } else if (typeof formData.service.ports === 'object') {
+            // 对象格式的端口
+            Object.entries(formData.service.ports).forEach(([name, port]) => {
+                ports.push({
+                    name: name,
+                    port: port
+                });
+            });
+        }
+
+        // 确保至少有一个端口
+        if (ports.length === 0) {
+            ports.push({
+                name: 'http',
+                port: 80
+            });
+        }
+
+        // 生成端口配置
+        let portsYaml = '';
+        if (ports.length === 1) {
+            // 单端口情况
+            portsYaml = `            - name: ${ports[0].name}
+              containerPort: ${ports[0].port}
+              protocol: TCP`;
+        } else {
+            // 多端口情况
+            portsYaml = ports.map(port =>
+                `            - name: ${port.name}
+              containerPort: ${port.port}
+              protocol: TCP`
+            ).join('\n');
+        }
+
         return `apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -1102,11 +1147,7 @@ spec:
           image: "{{ .Values.image.imageRegistry }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
-            {{- range $name, $port := .Values.service.ports }}
-            - name: {{ $name }}
-              containerPort: {{ $port }}
-              protocol: TCP
-            {{- end }}
+${portsYaml}
           {{- if .Values.env }}
           env:
             {{- if kindIs "map" .Values.env }}
@@ -1155,6 +1196,51 @@ spec:
 
     // 生成StatefulSet YAML
     function generateStatefulSetYaml(formData) {
+        // 获取所有端口信息
+        const ports = [];
+
+        if (formData.service.ports.length > 0) {
+            // 数组格式的端口
+            formData.service.ports.forEach(port => {
+                ports.push({
+                    name: port.name,
+                    port: port.port
+                });
+            });
+        } else if (typeof formData.service.ports === 'object') {
+            // 对象格式的端口
+            Object.entries(formData.service.ports).forEach(([name, port]) => {
+                ports.push({
+                    name: name,
+                    port: port
+                });
+            });
+        }
+
+        // 确保至少有一个端口
+        if (ports.length === 0) {
+            ports.push({
+                name: 'http',
+                port: 80
+            });
+        }
+
+        // 生成端口配置
+        let portsYaml = '';
+        if (ports.length === 1) {
+            // 单端口情况
+            portsYaml = `            - name: ${ports[0].name}
+              containerPort: ${ports[0].port}
+              protocol: TCP`;
+        } else {
+            // 多端口情况
+            portsYaml = ports.map(port =>
+                `            - name: ${port.name}
+              containerPort: ${port.port}
+              protocol: TCP`
+            ).join('\n');
+        }
+
         return `apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -1185,11 +1271,7 @@ spec:
           image: "{{ .Values.image.imageRegistry }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
-            {{- range $name, $port := .Values.service.ports }}
-            - name: {{ $name }}
-              containerPort: {{ $port }}
-              protocol: TCP
-            {{- end }}
+${portsYaml}
           {{- if .Values.env }}
           env:
             {{- if kindIs "map" .Values.env }}
@@ -1240,23 +1322,65 @@ spec:
     function generateServiceYaml() {
         const formData = getFormData();
 
+        // 获取所有端口信息
+        const ports = [];
+
+        if (formData.service.ports.length > 0) {
+            // 数组格式的端口
+            formData.service.ports.forEach(port => {
+                ports.push({
+                    name: port.name,
+                    port: port.port
+                });
+            });
+        } else if (typeof formData.service.ports === 'object') {
+            // 对象格式的端口
+            Object.entries(formData.service.ports).forEach(([name, port]) => {
+                ports.push({
+                    name: name,
+                    port: port
+                });
+            });
+        }
+
+        // 确保至少有一个端口
+        if (ports.length === 0) {
+            ports.push({
+                name: 'http',
+                port: 80
+            });
+        }
+
+        // 生成端口配置
+        let portsYaml = '';
+        if (ports.length === 1) {
+            // 单端口情况，使用简单格式
+            portsYaml = `    - port: {{ .Values.service.ports.${ports[0].name} }}
+      targetPort: ${ports[0].port}
+      protocol: TCP
+      name: ${ports[0].name}`;
+        } else {
+            // 多端口情况，使用循环格式
+            portsYaml = `    {{- range $name, $port := .Values.service.ports }}
+    - port: {{ $port }}
+      targetPort: {{ $port }}
+      protocol: TCP
+      name: {{ $name }}
+    {{- end }}`;
+        }
+
         return `apiVersion: v1
 kind: Service
 metadata:
   name: {{ include "${formData.name}.fullname" . }}
-  labels:
-    {{- include "${formData.name}.labels" . | nindent 4 }}
+  labels: {{- include "${formData.name}.labels" . | nindent 4 }}
+  annotations:
+    app.kubernetes.io/component: ${formData.workloadType === 'StatefulSet' ? 'stateful-app' : 'application'}
 spec:
   type: {{ .Values.service.type }}
   ports:
-    {{- range $name, $port := .Values.service.ports }}
-    - port: {{ $port }}
-      targetPort: {{ $name }}
-      protocol: TCP
-      name: {{ $name }}
-    {{- end }}
-  selector:
-    {{- include "${formData.name}.selectorLabels" . | nindent 4 }}`;
+${portsYaml}
+  selector: {{- include "${formData.name}.selectorLabels" . | nindent 4 }}`;
     }
 
     // 生成pvc.yaml
