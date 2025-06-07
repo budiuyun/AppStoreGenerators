@@ -23,7 +23,6 @@
                 <button class="tab-btn" data-tab="service">服务配置</button>
                 <button class="tab-btn" data-tab="resources">资源与存储</button>
                 <button class="tab-btn" data-tab="env">环境变量</button>
-                <button class="tab-btn" data-tab="json">JSON配置</button>
                 <button class="tab-btn" data-tab="preview">预览生成</button>
             </div>
 
@@ -271,55 +270,6 @@
                     </div>
 
                     <button type="button" id="add-env">添加环境变量</button>
-                </div>
-
-                <!-- JSON配置 -->
-                <div class="tab-pane" id="json">
-                    <h2>JSON配置</h2>
-                    <p class="info">在下方文本框中粘贴JSON配置，点击"应用JSON配置"按钮将自动填充表单</p>
-
-                    <div class="form-group">
-                        <textarea id="json-input" class="json-textarea" placeholder="粘贴JSON配置到这里..."></textarea>
-                    </div>
-
-                    <div class="json-actions">
-                        <button type="button" id="apply-json-btn" class="cloud-button primary">应用JSON配置</button>
-                        <button type="button" id="get-form-json-btn" class="cloud-button secondary">获取当前表单JSON</button>
-                        <button type="button" id="format-json-btn" class="cloud-button secondary">格式化JSON</button>
-                        <button type="button" id="clear-json-btn" class="cloud-button secondary">清空</button>
-                    </div>
-
-                    <div class="json-help">
-                        <h3>JSON格式示例</h3>
-                        <pre class="json-example">
-{
-  "name": "nginx",
-  "version": "v1.0.0",
-  "appVersion": "1.21.0",
-  "description": "高性能Web服务器",
-  "icon": "https://example.com/icon.png",
-  "category": "网络工具",
-  "maintainer": {
-    "name": "张三",
-    "email": "zhangsan@example.com"
-  },
-  "workloadType": "Deployment",
-  "image": {
-    "imageRegistry": "docker.io",
-    "repository": "nginx",
-    "tag": "latest",
-    "pullPolicy": "IfNotPresent"
-  },
-  "service": {
-    "type": "ClusterIP",
-    "ports": {
-      "http": 80,
-      "https": 443
-    }
-  }
-}
-</pre>
-                    </div>
                 </div>
 
                 <!-- 预览生成 -->
