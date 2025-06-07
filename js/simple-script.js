@@ -22,37 +22,132 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    // 导入JSON功能
-    const importJsonBtn = document.getElementById('import-json-btn');
-    const importJsonFile = document.getElementById('import-json-file');
+    // JSON标签页功能
+    const applyJsonBtn = document.getElementById('apply-json-btn');
+    const loadExampleBtn = document.getElementById('load-example-btn');
+    const clearJsonBtn = document.getElementById('clear-json-btn');
+    const copyJsonBtn = document.getElementById('copy-json-btn');
+    const jsonInput = document.getElementById('json-input');
 
-    importJsonBtn.addEventListener('click', () => {
-        if (!importJsonFile.files || importJsonFile.files.length === 0) {
-            alert('请先选择一个JSON文件');
+    // 应用JSON按钮
+    applyJsonBtn.addEventListener('click', () => {
+        try {
+            const jsonText = jsonInput.value.trim();
+            if (!jsonText) {
+                alert('请先输入或粘贴JSON配置');
+                return;
+            }
+
+            const jsonData = JSON.parse(jsonText);
+            fillFormFromJson(jsonData);
+
+            // 切换到基本信息标签页
+            document.querySelector('.tab-btn[data-tab="basic"]').click();
+
+            alert('JSON配置已成功应用到表单');
+        } catch (error) {
+            alert('JSON解析失败: ' + error.message);
+            console.error('JSON解析失败:', error);
+        }
+    });
+
+    // 加载示例按钮
+    loadExampleBtn.addEventListener('click', () => {
+        // Nginx示例配置
+        const exampleConfig = {
+            "name": "nginx",
+            "version": "v1.0.0",
+            "appVersion": "1.21.0",
+            "description": "高性能Web服务器和反向代理",
+            "icon": "https://example.com/nginx-icon.png",
+            "category": "网络工具",
+            "maintainer": {
+                "name": "张三",
+                "email": "zhangsan@example.com"
+            },
+            "workloadType": "Deployment",
+            "image": {
+                "imageRegistry": "docker.io",
+                "repository": "nginx",
+                "tag": "latest",
+                "pullPolicy": "IfNotPresent"
+            },
+            "service": {
+                "type": "ClusterIP",
+                "ports": {
+                    "http": 80,
+                    "https": 443
+                }
+            },
+            "networkLimits": {
+                "enabled": true,
+                "egress": "1M",
+                "ingress": "1M"
+            },
+            "resources": {
+                "limits": {
+                    "cpu": "200m",
+                    "memory": "256Mi"
+                },
+                "requests": {
+                    "cpu": "100m",
+                    "memory": "128Mi"
+                }
+            },
+            "persistence": {
+                "enabled": true,
+                "path": "/usr/share/nginx/html",
+                "accessMode": "ReadWriteOnce",
+                "size": "1Gi",
+                "storageClass": "local"
+            },
+            "envVars": [
+                {
+                    "title": "运行模式",
+                    "description": "Nginx运行模式",
+                    "name": "NGINX_MODE",
+                    "value": "production"
+                },
+                {
+                    "title": "工作进程数",
+                    "description": "Nginx工作进程数量",
+                    "name": "NGINX_WORKER_PROCESSES",
+                    "value": "auto"
+                }
+            ]
+        };
+
+        jsonInput.value = JSON.stringify(exampleConfig, null, 2);
+    });
+
+    // 清空按钮
+    clearJsonBtn.addEventListener('click', () => {
+        if (confirm('确定要清空JSON内容吗？')) {
+            jsonInput.value = '';
+        }
+    });
+
+    // 复制JSON按钮
+    copyJsonBtn.addEventListener('click', () => {
+        const jsonText = jsonInput.value.trim();
+        if (!jsonText) {
+            alert('没有可复制的JSON内容');
             return;
         }
 
-        const file = importJsonFile.files[0];
-        const reader = new FileReader();
+        // 复制到剪贴板
+        navigator.clipboard.writeText(jsonText)
+            .then(() => {
+                alert('JSON已复制到剪贴板');
+            })
+            .catch(err => {
+                console.error('复制失败:', err);
 
-        reader.onload = function (e) {
-            try {
-                const jsonData = JSON.parse(e.target.result);
-                fillFormFromJson(jsonData);
-                alert('JSON配置已成功导入');
-                // 更新预览
-                updatePreviews();
-            } catch (error) {
-                alert('JSON解析失败: ' + error.message);
-                console.error('JSON解析失败:', error);
-            }
-        };
-
-        reader.onerror = function () {
-            alert('读取文件失败');
-        };
-
-        reader.readAsText(file);
+                // 备用复制方法
+                jsonInput.select();
+                document.execCommand('copy');
+                alert('JSON已复制到剪贴板');
+            });
     });
 
     // 从JSON填充表单
@@ -381,7 +476,22 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // 导出JSON按钮
     const exportJsonBtn = document.getElementById('export-json-btn');
-    exportJsonBtn.addEventListener('click', exportJson);
+    exportJsonBtn.addEventListener('click', () => {
+        if (!validateForm()) {
+            return;
+        }
+
+        const formData = getFormData();
+        const jsonString = JSON.stringify(formData, null, 2);
+
+        // 将JSON填充到JSON标签页的文本框中
+        document.getElementById('json-input').value = jsonString;
+
+        // 切换到JSON标签页
+        document.querySelector('.tab-btn[data-tab="json"]').click();
+
+        alert('JSON配置已生成，可以复制或编辑');
+    });
 
     // 重置按钮
     const resetBtn = document.getElementById('reset-btn');
@@ -1358,27 +1468,6 @@ helm install my-release ./${formData.name}
         }
 
         alert('表单已重置');
-    }
-
-    // 导出JSON配置
-    function exportJson() {
-        if (!validateForm()) {
-            return;
-        }
-
-        const formData = getFormData();
-        const jsonString = JSON.stringify(formData, null, 2);
-
-        // 创建下载链接
-        const blob = new Blob([jsonString], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `${formData.name}-config.json`;
-        link.click();
-        URL.revokeObjectURL(url);
-
-        alert('JSON配置已成功导出');
     }
 
     // 初始化预览

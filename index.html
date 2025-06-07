@@ -18,7 +18,8 @@
     <main>
         <div class="container">
             <div class="tabs">
-                <button class="tab-btn active" data-tab="basic">基本信息</button>
+                <button class="tab-btn active" data-tab="json">JSON配置</button>
+                <button class="tab-btn" data-tab="basic">基本信息</button>
                 <button class="tab-btn" data-tab="image">容器镜像</button>
                 <button class="tab-btn" data-tab="service">服务配置</button>
                 <button class="tab-btn" data-tab="resources">资源与存储</button>
@@ -27,14 +28,26 @@
             </div>
 
             <div class="tab-content">
-                <!-- 基本信息 -->
-                <div class="tab-pane active" id="basic">
-                    <h2>基本信息</h2>
-                    <div class="import-json-section">
-                        <label for="import-json-file" class="import-json-label">导入JSON配置</label>
-                        <input type="file" id="import-json-file" accept=".json">
-                        <button type="button" id="import-json-btn" class="cloud-button secondary">导入JSON</button>
+                <!-- JSON配置 -->
+                <div class="tab-pane active" id="json">
+                    <h2>JSON配置</h2>
+                    <p class="info">在下面的文本框中粘贴JSON配置，然后点击"应用JSON"按钮将配置应用到表单。</p>
+
+                    <div class="form-group">
+                        <textarea id="json-input" placeholder="粘贴JSON配置到这里..." rows="20"></textarea>
                     </div>
+
+                    <div class="json-actions">
+                        <button id="apply-json-btn" class="cloud-button primary">应用JSON</button>
+                        <button id="copy-json-btn" class="cloud-button secondary">复制JSON</button>
+                        <button id="load-example-btn" class="cloud-button secondary">加载示例</button>
+                        <button id="clear-json-btn" class="cloud-button secondary">清空</button>
+                    </div>
+                </div>
+
+                <!-- 基本信息 -->
+                <div class="tab-pane" id="basic">
+                    <h2>基本信息</h2>
                     <div class="form-group">
                         <label for="name">应用名称 *</label>
                         <input type="text" id="name" placeholder="例如：mysql" required>

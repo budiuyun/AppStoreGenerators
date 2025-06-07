@@ -8,20 +8,21 @@
 - 🎨 支持明暗两种主题模式，符合naive-ui风格
 - 📝 提供可视化表单，轻松配置应用参数
 - 💾 支持导出为ZIP压缩包，便于分享和使用
-- 🔄 支持导入/导出JSON配置，方便复用和共享
+- 🔄 支持JSON配置导入导出，方便复用和共享
 - 🔧 遵循Kubernetes最佳实践，生成高质量配置
 
 ## 使用方法
 
 1. 访问 [https://yourusername.github.io/AppStoreGenerators-/](https://yourusername.github.io/AppStoreGenerators-/)
-2. 填写应用基本信息、镜像配置、资源限制等参数
-3. 实时预览生成的YAML文件内容
-4. 点击"下载Helm Chart文件包"按钮获取完整配置
-5. 可以使用"导出JSON配置"保存当前配置，或使用"导入JSON"加载已有配置
+2. 使用JSON标签页可以直接粘贴或编辑JSON配置，点击"应用JSON"按钮将配置应用到表单
+3. 或者直接填写应用基本信息、镜像配置、资源限制等参数
+4. 实时预览生成的YAML文件内容
+5. 点击"下载Helm Chart文件包"按钮获取完整配置
+6. 可以使用"导出JSON配置"功能将当前表单数据导出为JSON格式
 
 ## JSON配置格式
 
-导入和导出的JSON配置文件格式如下：
+JSON标签页支持以下格式的配置：
 
 ```json
 {
@@ -82,72 +83,7 @@
 }
 ```
 
-### 示例配置
-
-```json
-{
-  "name": "nginx",
-  "version": "v1.0.0",
-  "appVersion": "1.21.0",
-  "description": "高性能Web服务器和反向代理",
-  "icon": "https://example.com/nginx-icon.png",
-  "category": "网络工具",
-  "maintainer": {
-    "name": "张三",
-    "email": "zhangsan@example.com"
-  },
-  "workloadType": "Deployment",
-  "image": {
-    "imageRegistry": "docker.io",
-    "repository": "nginx",
-    "tag": "latest",
-    "pullPolicy": "IfNotPresent"
-  },
-  "service": {
-    "type": "ClusterIP",
-    "ports": {
-      "http": 80,
-      "https": 443
-    }
-  },
-  "networkLimits": {
-    "enabled": true,
-    "egress": "1M",
-    "ingress": "1M"
-  },
-  "resources": {
-    "limits": {
-      "cpu": "200m",
-      "memory": "256Mi"
-    },
-    "requests": {
-      "cpu": "100m",
-      "memory": "128Mi"
-    }
-  },
-  "persistence": {
-    "enabled": true,
-    "path": "/usr/share/nginx/html",
-    "accessMode": "ReadWriteOnce",
-    "size": "1Gi",
-    "storageClass": "local"
-  },
-  "envVars": [
-    {
-      "title": "运行模式",
-      "description": "Nginx运行模式",
-      "name": "NGINX_MODE",
-      "value": "production"
-    },
-    {
-      "title": "工作进程数",
-      "description": "Nginx工作进程数量",
-      "name": "NGINX_WORKER_PROCESSES",
-      "value": "auto"
-    }
-  ]
-}
-```
+可以使用"加载示例"按钮查看完整的JSON配置示例。
 
 ## 本地开发
 
