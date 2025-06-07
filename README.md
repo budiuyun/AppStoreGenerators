@@ -24,6 +24,8 @@
 
 JSON标签页支持以下格式的配置：
 
+> **注意**：JSON配置中的键名不区分大小写，例如"appVersion"和"appversion"都是有效的。固定值（如pullPolicy、serviceType和networkEnabled）不需要在JSON中指定，系统会使用默认值。
+
 ```json
 {
   "name": "应用名称",
@@ -40,18 +42,15 @@ JSON标签页支持以下格式的配置：
   "image": {
     "imageRegistry": "镜像仓库地址",
     "repository": "镜像名称",
-    "tag": "镜像标签",
-    "pullPolicy": "镜像拉取策略"
+    "tag": "镜像标签"
   },
   "service": {
-    "type": "服务类型",
     "ports": {
       "http": 80,
       "https": 443
     }
   },
   "networkLimits": {
-    "enabled": true,
     "egress": "出站带宽限制",
     "ingress": "入站带宽限制"
   },

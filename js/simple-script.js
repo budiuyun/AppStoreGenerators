@@ -44,7 +44,10 @@ document.addEventListener('DOMContentLoaded', function () {
             // 切换到基本信息标签页
             document.querySelector('.tab-btn[data-tab="basic"]').click();
 
-            alert('JSON配置已成功应用到表单');
+            alert('JSON配置已成功应用到表单，请检查所有字段是否正确填充');
+
+            // 更新预览
+            updatePreviews();
         } catch (error) {
             alert('JSON解析失败: ' + error.message);
             console.error('JSON解析失败:', error);
@@ -152,63 +155,94 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // 从JSON填充表单
     function fillFormFromJson(data) {
+        // 处理JSON键名大小写不敏感的问题
+        const normalizeData = (obj) => {
+            if (obj === null || typeof obj !== 'object') return obj;
+
+            const normalized = {};
+            Object.keys(obj).forEach(key => {
+                const lowerKey = key.toLowerCase();
+                const value = obj[key];
+
+                if (Array.isArray(value)) {
+                    normalized[lowerKey] = value.map(item =>
+                        typeof item === 'object' && item !== null ? normalizeData(item) : item
+                    );
+                } else if (typeof value === 'object' && value !== null) {
+                    normalized[lowerKey] = normalizeData(value);
+                } else {
+                    normalized[lowerKey] = value;
+                }
+            });
+
+            return normalized;
+        };
+
+        // 规范化数据，处理大小写不敏感
+        const normalizedData = normalizeData(data);
+
         // 基本信息
-        if (data.name) document.getElementById('name').value = data.name;
-        if (data.version) document.getElementById('version').value = data.version;
-        if (data.appVersion) document.getElementById('appVersion').value = data.appVersion;
-        if (data.description) document.getElementById('description').value = data.description;
-        if (data.icon) document.getElementById('icon').value = data.icon;
+        if (normalizedData.name) document.getElementById('name').value = normalizedData.name;
+        if (normalizedData.version) document.getElementById('version').value = normalizedData.version;
+        if (normalizedData.appversion) document.getElementById('appVersion').value = normalizedData.appversion;
+        if (normalizedData.description) document.getElementById('description').value = normalizedData.description;
+        if (normalizedData.icon) document.getElementById('icon').value = normalizedData.icon;
 
         // 分类
-        if (data.category) {
+        if (normalizedData.category) {
             const categorySelect = document.getElementById('category');
             const customCategoryInput = document.getElementById('customCategory');
 
             // 检查是否是预定义分类
             const categories = Array.from(categorySelect.options).map(opt => opt.value);
-            if (categories.includes(data.category) && data.category !== 'custom') {
-                categorySelect.value = data.category;
+            if (categories.includes(normalizedData.category) && normalizedData.category !== 'custom') {
+                categorySelect.value = normalizedData.category;
                 customCategoryInput.style.display = 'none';
             } else {
                 categorySelect.value = 'custom';
                 customCategoryInput.style.display = 'block';
-                customCategoryInput.value = data.category;
+                customCategoryInput.value = normalizedData.category;
             }
         }
 
         // 维护者信息
-        if (data.maintainer) {
-            if (data.maintainer.name) document.getElementById('maintainerName').value = data.maintainer.name;
-            if (data.maintainer.email) document.getElementById('maintainerEmail').value = data.maintainer.email;
+        if (normalizedData.maintainer) {
+            if (normalizedData.maintainer.name) document.getElementById('maintainerName').value = normalizedData.maintainer.name;
+            if (normalizedData.maintainer.email) document.getElementById('maintainerEmail').value = normalizedData.maintainer.email;
         }
 
-        // 工作负载类型
-        if (data.workloadType) document.getElementById('workloadType').value = data.workloadType;
+        // 工作负载类型 - 不区分大小写
+        if (normalizedData.workloadtype) {
+            const workloadType = normalizedData.workloadtype.toLowerCase();
+            if (workloadType === 'deployment' || workloadType === 'statefulset') {
+                document.getElementById('workloadType').value = workloadType.charAt(0).toUpperCase() + workloadType.slice(1);
+            }
+        }
 
         // 镜像信息
-        if (data.image) {
-            if (data.image.imageRegistry) document.getElementById('imageRegistry').value = data.image.imageRegistry;
-            if (data.image.repository) document.getElementById('repository').value = data.image.repository;
-            if (data.image.tag) document.getElementById('tag').value = data.image.tag;
-            if (data.image.pullPolicy) document.getElementById('pullPolicy').value = data.image.pullPolicy;
+        if (normalizedData.image) {
+            if (normalizedData.image.imageregistry) document.getElementById('imageRegistry').value = normalizedData.image.imageregistry;
+            if (normalizedData.image.repository) document.getElementById('repository').value = normalizedData.image.repository;
+            if (normalizedData.image.tag) document.getElementById('tag').value = normalizedData.image.tag;
+            // pullPolicy是固定值，不需要从JSON中读取
         }
 
         // 服务配置
-        if (data.service) {
-            if (data.service.type) document.getElementById('serviceType').value = data.service.type;
+        if (normalizedData.service) {
+            // serviceType是固定值，不需要从JSON中读取
 
             // 清除现有端口
             const portContainer = document.getElementById('service-ports-container');
             portContainer.innerHTML = '';
 
             // 添加端口
-            if (data.service.ports && Array.isArray(data.service.ports)) {
-                data.service.ports.forEach(port => {
+            if (normalizedData.service.ports && Array.isArray(normalizedData.service.ports)) {
+                normalizedData.service.ports.forEach(port => {
                     addPortRow(port.name, port.port);
                 });
-            } else if (data.service.ports && typeof data.service.ports === 'object') {
+            } else if (normalizedData.service.ports && typeof normalizedData.service.ports === 'object') {
                 // 处理对象格式的端口
-                Object.entries(data.service.ports).forEach(([name, port]) => {
+                Object.entries(normalizedData.service.ports).forEach(([name, port]) => {
                     addPortRow(name, port);
                 });
             }
@@ -220,39 +254,33 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         // 网络限制
-        if (data.networkLimits) {
-            if (data.networkLimits.enabled !== undefined) {
-                document.getElementById('networkEnabled').checked = data.networkLimits.enabled;
-            }
-            if (data.networkLimits.egress) document.getElementById('egress').value = data.networkLimits.egress;
-            if (data.networkLimits.ingress) document.getElementById('ingress').value = data.networkLimits.ingress;
-
-            // 显示/隐藏网络设置
-            document.querySelector('.network-settings').style.display =
-                document.getElementById('networkEnabled').checked ? 'block' : 'none';
+        if (normalizedData.networklimits) {
+            // networkEnabled是固定值，不需要从JSON中读取
+            if (normalizedData.networklimits.egress) document.getElementById('egress').value = normalizedData.networklimits.egress;
+            if (normalizedData.networklimits.ingress) document.getElementById('ingress').value = normalizedData.networklimits.ingress;
         }
 
         // 资源限制
-        if (data.resources) {
-            if (data.resources.limits) {
-                if (data.resources.limits.cpu) document.getElementById('limitsCpu').value = data.resources.limits.cpu;
-                if (data.resources.limits.memory) document.getElementById('limitsMemory').value = data.resources.limits.memory;
+        if (normalizedData.resources) {
+            if (normalizedData.resources.limits) {
+                if (normalizedData.resources.limits.cpu) document.getElementById('limitsCpu').value = normalizedData.resources.limits.cpu;
+                if (normalizedData.resources.limits.memory) document.getElementById('limitsMemory').value = normalizedData.resources.limits.memory;
             }
-            if (data.resources.requests) {
-                if (data.resources.requests.cpu) document.getElementById('requestsCpu').value = data.resources.requests.cpu;
-                if (data.resources.requests.memory) document.getElementById('requestsMemory').value = data.resources.requests.memory;
+            if (normalizedData.resources.requests) {
+                if (normalizedData.resources.requests.cpu) document.getElementById('requestsCpu').value = normalizedData.resources.requests.cpu;
+                if (normalizedData.resources.requests.memory) document.getElementById('requestsMemory').value = normalizedData.resources.requests.memory;
             }
         }
 
         // 持久化存储
-        if (data.persistence) {
-            if (data.persistence.enabled !== undefined) {
-                document.getElementById('persistenceEnabled').checked = data.persistence.enabled;
+        if (normalizedData.persistence) {
+            if (normalizedData.persistence.enabled !== undefined) {
+                document.getElementById('persistenceEnabled').checked = normalizedData.persistence.enabled;
             }
-            if (data.persistence.path) document.getElementById('path').value = data.persistence.path;
-            if (data.persistence.accessMode) document.getElementById('accessMode').value = data.persistence.accessMode;
-            if (data.persistence.size) document.getElementById('size').value = data.persistence.size;
-            if (data.persistence.storageClass) document.getElementById('storageClass').value = data.persistence.storageClass;
+            if (normalizedData.persistence.path) document.getElementById('path').value = normalizedData.persistence.path;
+            if (normalizedData.persistence.accessmode) document.getElementById('accessMode').value = normalizedData.persistence.accessmode;
+            if (normalizedData.persistence.size) document.getElementById('size').value = normalizedData.persistence.size;
+            if (normalizedData.persistence.storageclass) document.getElementById('storageClass').value = normalizedData.persistence.storageclass;
 
             // 显示/隐藏持久化设置
             document.querySelector('.persistence-settings').style.display =
@@ -260,28 +288,33 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         // 环境变量
-        if (data.envVars && Array.isArray(data.envVars)) {
+        if (normalizedData.envvars && Array.isArray(normalizedData.envvars)) {
             // 清除现有环境变量
             const envContainer = document.getElementById('env-container');
             envContainer.innerHTML = '';
 
             // 添加环境变量
-            data.envVars.forEach(env => {
+            normalizedData.envvars.forEach(env => {
                 addEnvRow(env.title, env.description, env.name, env.value);
             });
-        } else if (data.env) {
+
+            // 确保至少有一个环境变量行
+            if (document.querySelectorAll('.env-row').length === 0) {
+                addEnvRow('应用模式', '应用运行的模式', 'APP_MODE', 'production');
+            }
+        } else if (normalizedData.env) {
             // 处理env对象格式
             const envContainer = document.getElementById('env-container');
             envContainer.innerHTML = '';
 
-            Object.values(data.env).forEach(env => {
+            Object.values(normalizedData.env).forEach(env => {
                 addEnvRow(env.title, env.description, env.name, env.value);
             });
-        }
 
-        // 确保至少有一个环境变量行
-        if (document.querySelectorAll('.env-row').length === 0) {
-            addEnvRow('应用模式', '应用运行的模式', 'APP_MODE', 'production');
+            // 确保至少有一个环境变量行
+            if (document.querySelectorAll('.env-row').length === 0) {
+                addEnvRow('应用模式', '应用运行的模式', 'APP_MODE', 'production');
+            }
         }
     }
 
