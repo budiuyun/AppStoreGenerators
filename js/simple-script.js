@@ -620,11 +620,13 @@ document.addEventListener('DOMContentLoaded', function () {
             resources: {
                 limits: {
                     cpu: document.getElementById('limitsCpu').value.trim(),
-                    memory: document.getElementById('limitsMemory').value.trim()
+                    memory: document.getElementById('limitsMemory').value.trim(),
+                    "ephemeral-storage": "10Gi" // 默认添加临时存储限制为10Gi
                 },
                 requests: {
                     cpu: document.getElementById('requestsCpu').value.trim(),
-                    memory: document.getElementById('requestsMemory').value.trim()
+                    memory: document.getElementById('requestsMemory').value.trim(),
+                    "ephemeral-storage": "5Gi" // 默认添加临时存储请求为5Gi
                 }
             },
             persistence: {
@@ -763,7 +765,18 @@ document.addEventListener('DOMContentLoaded', function () {
                 }, {})
             },
             networkLimits: formData.networkLimits,
-            resources: formData.resources,
+            resources: {
+                limits: {
+                    cpu: formData.resources.limits.cpu,
+                    memory: formData.resources.limits.memory,
+                    "ephemeral-storage": formData.resources.limits["ephemeral-storage"] || "10Gi"
+                },
+                requests: {
+                    cpu: formData.resources.requests.cpu,
+                    memory: formData.resources.requests.memory,
+                    "ephemeral-storage": formData.resources.requests["ephemeral-storage"] || "5Gi"
+                }
+            },
             persistence: formData.persistence
         };
 
@@ -933,6 +946,13 @@ document.addEventListener('DOMContentLoaded', function () {
                                     "description": "内存资源限制，可以是Mi或Gi，留空表示无限制",
                                     "pattern": "^[0-9]+(Mi|Gi)$|^$",
                                     "default": "256Mi"
+                                },
+                                "ephemeral-storage": {
+                                    "type": ["string", "null"],
+                                    "title": "临时存储限制",
+                                    "description": "临时存储资源限制，可以是Mi或Gi",
+                                    "pattern": "^[0-9]+(Mi|Gi)$|^$",
+                                    "default": "10Gi"
                                 }
                             }
                         },
@@ -954,6 +974,13 @@ document.addEventListener('DOMContentLoaded', function () {
                                     "description": "内存资源请求，可以是Mi或Gi，留空表示无限制",
                                     "pattern": "^[0-9]+(Mi|Gi)$|^$",
                                     "default": "128Mi"
+                                },
+                                "ephemeral-storage": {
+                                    "type": ["string", "null"],
+                                    "title": "临时存储请求",
+                                    "description": "临时存储资源请求，可以是Mi或Gi",
+                                    "pattern": "^[0-9]+(Mi|Gi)$|^$",
+                                    "default": "5Gi"
                                 }
                             }
                         }
@@ -1163,7 +1190,6 @@ ${portsYaml}
             {{- end }}
           {{- end }}
           resources:
-            {{- if or .Values.resources.limits.cpu .Values.resources.limits.memory }}
             limits:
               {{- if .Values.resources.limits.cpu }}
               cpu: {{ .Values.resources.limits.cpu | quote }}
@@ -1171,8 +1197,9 @@ ${portsYaml}
               {{- if .Values.resources.limits.memory }}
               memory: {{ .Values.resources.limits.memory | quote }}
               {{- end }}
-            {{- end }}
-            {{- if or .Values.resources.requests.cpu .Values.resources.requests.memory }}
+              {{- if hasKey .Values.resources.limits "ephemeral-storage" }}
+              ephemeral-storage: {{ .Values.resources.limits.ephemeral-storage | quote }}
+              {{- end }}
             requests:
               {{- if .Values.resources.requests.cpu }}
               cpu: {{ .Values.resources.requests.cpu | quote }}
@@ -1180,7 +1207,9 @@ ${portsYaml}
               {{- if .Values.resources.requests.memory }}
               memory: {{ .Values.resources.requests.memory | quote }}
               {{- end }}
-            {{- end }}
+              {{- if hasKey .Values.resources.requests "ephemeral-storage" }}
+              ephemeral-storage: {{ .Values.resources.requests.ephemeral-storage | quote }}
+              {{- end }}
           {{- if .Values.persistence.enabled }}
           volumeMounts:
             - name: data
@@ -1287,7 +1316,6 @@ ${portsYaml}
             {{- end }}
           {{- end }}
           resources:
-            {{- if or .Values.resources.limits.cpu .Values.resources.limits.memory }}
             limits:
               {{- if .Values.resources.limits.cpu }}
               cpu: {{ .Values.resources.limits.cpu | quote }}
@@ -1295,8 +1323,9 @@ ${portsYaml}
               {{- if .Values.resources.limits.memory }}
               memory: {{ .Values.resources.limits.memory | quote }}
               {{- end }}
-            {{- end }}
-            {{- if or .Values.resources.requests.cpu .Values.resources.requests.memory }}
+              {{- if hasKey .Values.resources.limits "ephemeral-storage" }}
+              ephemeral-storage: {{ .Values.resources.limits.ephemeral-storage | quote }}
+              {{- end }}
             requests:
               {{- if .Values.resources.requests.cpu }}
               cpu: {{ .Values.resources.requests.cpu | quote }}
@@ -1304,7 +1333,9 @@ ${portsYaml}
               {{- if .Values.resources.requests.memory }}
               memory: {{ .Values.resources.requests.memory | quote }}
               {{- end }}
-            {{- end }}
+              {{- if hasKey .Values.resources.requests "ephemeral-storage" }}
+              ephemeral-storage: {{ .Values.resources.requests.ephemeral-storage | quote }}
+              {{- end }}
           {{- if .Values.persistence.enabled }}
           volumeMounts:
             - name: data
