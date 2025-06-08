@@ -794,6 +794,9 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         }
 
+        // 添加icon字段
+        values.icon = formData.icon;
+
         return jsyaml.dump(values);
     }
 
@@ -1100,59 +1103,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // 生成Deployment YAML
     function generateDeploymentYaml(formData) {
-        // 获取所有端口信息
-        const ports = [];
-
-        if (formData.service.ports.length > 0) {
-            // 数组格式的端口
-            formData.service.ports.forEach(port => {
-                ports.push({
-                    name: port.name,
-                    port: port.port
-                });
-            });
-        } else if (typeof formData.service.ports === 'object') {
-            // 对象格式的端口
-            Object.entries(formData.service.ports).forEach(([name, port]) => {
-                ports.push({
-                    name: name,
-                    port: port
-                });
-            });
-        }
-
-        // 确保至少有一个端口
-        if (ports.length === 0) {
-            ports.push({
-                name: 'http',
-                port: 80
-            });
-        }
-
-        // 生成端口配置
-        let portsYaml = '';
-        if (ports.length === 1) {
-            // 单端口情况
-            portsYaml = `            - name: ${ports[0].name}
-              containerPort: ${ports[0].port}
-              protocol: TCP`;
-        } else {
-            // 多端口情况
-            portsYaml = ports.map(port =>
-                `            - name: ${port.name}
-              containerPort: ${port.port}
-              protocol: TCP`
-            ).join('\n');
-        }
-
         return `apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "${formData.name}.fullname" . }}
   labels:
     {{- include "${formData.name}.labels" . | nindent 4 }}
-  annotations:
-    app.kubernetes.io/part-of: ${formData.name}
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
@@ -1161,55 +1117,29 @@ spec:
   template:
     metadata:
       labels:
-        {{- include "${formData.name}.labels" . | nindent 8 }}
         {{- include "${formData.name}.selectorLabels" . | nindent 8 }}
-      {{- if .Values.networkLimits.enabled }}
-      annotations:
-        kubernetes.io/egress-bandwidth: {{ .Values.networkLimits.egress | quote }}
-        kubernetes.io/ingress-bandwidth: {{ .Values.networkLimits.ingress | quote }}
-      {{- end }}
     spec:
       containers:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.imageRegistry }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.service.ports }}
           ports:
-${portsYaml}
+            {{- range $name, $port := .Values.service.ports }}
+            - name: {{ $name }}
+              containerPort: {{ $port }}
+              protocol: TCP
+            {{- end }}
+          {{- end }}
           {{- if .Values.env }}
           env:
-            {{- if kindIs "map" .Values.env }}
             {{- range $key, $value := .Values.env }}
-            - name: {{ $value.name | quote }}
+            - name: {{ $value.name }}
               value: {{ $value.value | quote }}
-            {{- end }}
-            {{- else if kindIs "array" .Values.env }}
-            {{- range .Values.env }}
-            - name: {{ .name | quote }}
-              value: {{ .value | quote }}
-            {{- end }}
             {{- end }}
           {{- end }}
           resources:
-            limits:
-              {{- if .Values.resources.limits.cpu }}
-              cpu: {{ .Values.resources.limits.cpu | quote }}
-              {{- end }}
-              {{- if .Values.resources.limits.memory }}
-              memory: {{ .Values.resources.limits.memory | quote }}
-              {{- end }}
-              {{- if hasKey .Values.resources.limits "ephemeral-storage" }}
-              ephemeral-storage: {{ index .Values.resources.limits "ephemeral-storage" | quote }}
-              {{- end }}
-            requests:
-              {{- if .Values.resources.requests.cpu }}
-              cpu: {{ .Values.resources.requests.cpu | quote }}
-              {{- end }}
-              {{- if .Values.resources.requests.memory }}
-              memory: {{ .Values.resources.requests.memory | quote }}
-              {{- end }}
-              {{- if hasKey .Values.resources.requests "ephemeral-storage" }}
-              ephemeral-storage: {{ index .Values.resources.requests "ephemeral-storage" | quote }}
-              {{- end }}
+            {{- toYaml .Values.resources | nindent 12 }}
           {{- if .Values.persistence.enabled }}
           volumeMounts:
             - name: data
@@ -1225,59 +1155,12 @@ ${portsYaml}
 
     // 生成StatefulSet YAML
     function generateStatefulSetYaml(formData) {
-        // 获取所有端口信息
-        const ports = [];
-
-        if (formData.service.ports.length > 0) {
-            // 数组格式的端口
-            formData.service.ports.forEach(port => {
-                ports.push({
-                    name: port.name,
-                    port: port.port
-                });
-            });
-        } else if (typeof formData.service.ports === 'object') {
-            // 对象格式的端口
-            Object.entries(formData.service.ports).forEach(([name, port]) => {
-                ports.push({
-                    name: name,
-                    port: port
-                });
-            });
-        }
-
-        // 确保至少有一个端口
-        if (ports.length === 0) {
-            ports.push({
-                name: 'http',
-                port: 80
-            });
-        }
-
-        // 生成端口配置
-        let portsYaml = '';
-        if (ports.length === 1) {
-            // 单端口情况
-            portsYaml = `            - name: ${ports[0].name}
-              containerPort: ${ports[0].port}
-              protocol: TCP`;
-        } else {
-            // 多端口情况
-            portsYaml = ports.map(port =>
-                `            - name: ${port.name}
-              containerPort: ${port.port}
-              protocol: TCP`
-            ).join('\n');
-        }
-
         return `apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: {{ include "${formData.name}.fullname" . }}
   labels:
     {{- include "${formData.name}.labels" . | nindent 4 }}
-  annotations:
-    app.kubernetes.io/part-of: ${formData.name}
 spec:
   serviceName: {{ include "${formData.name}.fullname" . }}
   replicas: {{ .Values.replicaCount }}
@@ -1287,55 +1170,29 @@ spec:
   template:
     metadata:
       labels:
-        {{- include "${formData.name}.labels" . | nindent 8 }}
         {{- include "${formData.name}.selectorLabels" . | nindent 8 }}
-      {{- if .Values.networkLimits.enabled }}
-      annotations:
-        kubernetes.io/egress-bandwidth: {{ .Values.networkLimits.egress | quote }}
-        kubernetes.io/ingress-bandwidth: {{ .Values.networkLimits.ingress | quote }}
-      {{- end }}
     spec:
       containers:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.imageRegistry }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.service.ports }}
           ports:
-${portsYaml}
+            {{- range $name, $port := .Values.service.ports }}
+            - name: {{ $name }}
+              containerPort: {{ $port }}
+              protocol: TCP
+            {{- end }}
+          {{- end }}
           {{- if .Values.env }}
           env:
-            {{- if kindIs "map" .Values.env }}
             {{- range $key, $value := .Values.env }}
-            - name: {{ $value.name | quote }}
+            - name: {{ $value.name }}
               value: {{ $value.value | quote }}
-            {{- end }}
-            {{- else if kindIs "array" .Values.env }}
-            {{- range .Values.env }}
-            - name: {{ .name | quote }}
-              value: {{ .value | quote }}
-            {{- end }}
             {{- end }}
           {{- end }}
           resources:
-            limits:
-              {{- if .Values.resources.limits.cpu }}
-              cpu: {{ .Values.resources.limits.cpu | quote }}
-              {{- end }}
-              {{- if .Values.resources.limits.memory }}
-              memory: {{ .Values.resources.limits.memory | quote }}
-              {{- end }}
-              {{- if hasKey .Values.resources.limits "ephemeral-storage" }}
-              ephemeral-storage: {{ index .Values.resources.limits "ephemeral-storage" | quote }}
-              {{- end }}
-            requests:
-              {{- if .Values.resources.requests.cpu }}
-              cpu: {{ .Values.resources.requests.cpu | quote }}
-              {{- end }}
-              {{- if .Values.resources.requests.memory }}
-              memory: {{ .Values.resources.requests.memory | quote }}
-              {{- end }}
-              {{- if hasKey .Values.resources.requests "ephemeral-storage" }}
-              ephemeral-storage: {{ index .Values.resources.requests "ephemeral-storage" | quote }}
-              {{- end }}
+            {{- toYaml .Values.resources | nindent 12 }}
           {{- if .Values.persistence.enabled }}
           volumeMounts:
             - name: data
@@ -1353,64 +1210,20 @@ ${portsYaml}
     function generateServiceYaml() {
         const formData = getFormData();
 
-        // 获取所有端口信息
-        const ports = [];
-
-        if (formData.service.ports.length > 0) {
-            // 数组格式的端口
-            formData.service.ports.forEach(port => {
-                ports.push({
-                    name: port.name,
-                    port: port.port
-                });
-            });
-        } else if (typeof formData.service.ports === 'object') {
-            // 对象格式的端口
-            Object.entries(formData.service.ports).forEach(([name, port]) => {
-                ports.push({
-                    name: name,
-                    port: port
-                });
-            });
-        }
-
-        // 确保至少有一个端口
-        if (ports.length === 0) {
-            ports.push({
-                name: 'http',
-                port: 80
-            });
-        }
-
-        // 生成端口配置
-        let portsYaml = '';
-        if (ports.length === 1) {
-            // 单端口情况，使用简单格式
-            portsYaml = `    - port: {{ .Values.service.ports.${ports[0].name} }}
-      targetPort: ${ports[0].port}
-      protocol: TCP
-      name: ${ports[0].name}`;
-        } else {
-            // 多端口情况，使用循环格式
-            portsYaml = `    {{- range $name, $port := .Values.service.ports }}
-    - port: {{ $port }}
-      targetPort: {{ $port }}
-      protocol: TCP
-      name: {{ $name }}
-    {{- end }}`;
-        }
-
         return `apiVersion: v1
 kind: Service
 metadata:
   name: {{ include "${formData.name}.fullname" . }}
   labels: {{- include "${formData.name}.labels" . | nindent 4 }}
-  annotations:
-    app.kubernetes.io/component: ${formData.workloadType === 'StatefulSet' ? 'stateful-app' : 'application'}
 spec:
   type: {{ .Values.service.type }}
   ports:
-${portsYaml}
+    {{- range $name, $port := .Values.service.ports }}
+    - port: {{ $port }}
+      targetPort: {{ $port }}
+      protocol: TCP
+      name: {{ $name }}
+    {{- end }}
   selector: {{- include "${formData.name}.selectorLabels" . | nindent 4 }}`;
     }
 
