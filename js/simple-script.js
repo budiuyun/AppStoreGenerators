@@ -99,10 +99,20 @@ document.addEventListener('DOMContentLoaded', function () {
             },
             "persistence": {
                 "enabled": true,
-                "path": "/usr/share/nginx/html",
-                "accessMode": "ReadWriteOnce",
-                "size": "1Gi",
-                "storageClass": "local"
+                "mounts": [
+                    {
+                        "path": "/usr/share/nginx/html",
+                        "accessMode": "ReadWriteOnce",
+                        "size": "1Gi",
+                        "storageClass": "local"
+                    },
+                    {
+                        "path": "/etc/nginx/conf.d",
+                        "accessMode": "ReadWriteOnce",
+                        "size": "500Mi",
+                        "storageClass": "local"
+                    }
+                ]
             },
             "envVars": [
                 {
@@ -277,14 +287,37 @@ document.addEventListener('DOMContentLoaded', function () {
             if (normalizedData.persistence.enabled !== undefined) {
                 document.getElementById('persistenceEnabled').checked = normalizedData.persistence.enabled;
             }
-            if (normalizedData.persistence.path) document.getElementById('path').value = normalizedData.persistence.path;
-            if (normalizedData.persistence.accessmode) document.getElementById('accessMode').value = normalizedData.persistence.accessmode;
-            if (normalizedData.persistence.size) document.getElementById('size').value = normalizedData.persistence.size;
-            if (normalizedData.persistence.storageclass) document.getElementById('storageClass').value = normalizedData.persistence.storageclass;
 
             // 显示/隐藏持久化设置
             document.querySelector('.persistence-settings').style.display =
                 document.getElementById('persistenceEnabled').checked ? 'block' : 'none';
+
+            // 处理多挂载点
+            if (normalizedData.persistence.mounts && Array.isArray(normalizedData.persistence.mounts)) {
+                // 清除现有挂载点
+                const mountContainer = document.getElementById('persistence-mounts-container');
+                mountContainer.innerHTML = '';
+
+                // 添加挂载点
+                normalizedData.persistence.mounts.forEach(mount => {
+                    addMountRow(mount.path, mount.size, mount.accessmode, mount.storageclass);
+                });
+
+                // 确保至少有一个挂载目录行
+                if (document.querySelectorAll('.persistence-mount-row').length === 0) {
+                    addMountRow('/data', '1Gi', 'ReadWriteOnce', 'local');
+                }
+            } else if (normalizedData.persistence.path) {
+                // 旧版格式兼容，将单个挂载点转换为多挂载点
+                const mountContainer = document.getElementById('persistence-mounts-container');
+                mountContainer.innerHTML = '';
+                addMountRow(
+                    normalizedData.persistence.path,
+                    normalizedData.persistence.size,
+                    normalizedData.persistence.accessmode,
+                    normalizedData.persistence.storageclass
+                );
+            }
         }
 
         // 环境变量
@@ -384,6 +417,49 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    // 辅助函数：添加挂载目录行
+    function addMountRow(path, size, accessMode, storageClass) {
+        const mountContainer = document.getElementById('persistence-mounts-container');
+        const mountRow = document.createElement('div');
+        mountRow.className = 'persistence-mount-row';
+
+        mountRow.innerHTML = `
+            <div class="form-group mount-path">
+                <label>挂载路径</label>
+                <input type="text" class="mount-path-input" placeholder="例如：/data" value="${path || '/data'}">
+            </div>
+            <div class="form-group mount-size">
+                <label>存储大小</label>
+                <input type="text" class="mount-size-input" placeholder="例如：1Gi" value="${size || '1Gi'}" pattern="^[0-9]+(Mi|Gi|Ti)$">
+            </div>
+            <div class="form-group mount-access-mode">
+                <label>访问模式</label>
+                <select class="mount-access-mode-select">
+                    <option value="ReadWriteOnce" ${accessMode === 'ReadWriteOnce' ? 'selected' : ''}>ReadWriteOnce (单节点读写)</option>
+                    <option value="ReadOnlyMany" ${accessMode === 'ReadOnlyMany' ? 'selected' : ''}>ReadOnlyMany (多节点只读)</option>
+                    <option value="ReadWriteMany" ${accessMode === 'ReadWriteMany' ? 'selected' : ''}>ReadWriteMany (多节点读写)</option>
+                </select>
+            </div>
+            <div class="form-group mount-storage-class">
+                <label>存储类</label>
+                <input type="text" class="mount-storage-class-input" placeholder="例如：local" value="${storageClass || 'local'}">
+            </div>
+            <button type="button" class="remove-mount">删除</button>
+        `;
+
+        mountContainer.appendChild(mountRow);
+
+        // 添加删除挂载目录的事件监听
+        const removeBtn = mountRow.querySelector('.remove-mount');
+        removeBtn.addEventListener('click', () => {
+            if (document.querySelectorAll('.persistence-mount-row').length <= 1) {
+                alert('至少需要一个挂载目录！');
+                return;
+            }
+            mountRow.remove();
+        });
+    }
+
     // 预览标签页切换
     const previewTabs = document.querySelectorAll('.preview-tab');
     const previewContents = document.querySelectorAll('.preview-content pre');
@@ -416,6 +492,26 @@ document.addEventListener('DOMContentLoaded', function () {
 
     persistenceEnabled.addEventListener('change', () => {
         persistenceSettings.style.display = persistenceEnabled.checked ? 'block' : 'none';
+    });
+
+    // 添加挂载目录
+    const addMountBtn = document.getElementById('add-mount');
+    const mountContainer = document.getElementById('persistence-mounts-container');
+
+    addMountBtn.addEventListener('click', () => {
+        addMountRow('/data', '1Gi', 'ReadWriteOnce', 'local');
+    });
+
+    // 初始化删除挂载目录按钮
+    document.querySelectorAll('.remove-mount').forEach(btn => {
+        btn.addEventListener('click', function () {
+            // 如果只有一个挂载目录，不允许删除
+            if (document.querySelectorAll('.persistence-mount-row').length <= 1) {
+                alert('至少需要一个挂载目录！');
+                return;
+            }
+            this.closest('.persistence-mount-row').remove();
+        });
     });
 
     // 添加端口
@@ -589,6 +685,24 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
 
+        // 收集挂载目录
+        const mounts = [];
+        document.querySelectorAll('.persistence-mount-row').forEach(row => {
+            const path = row.querySelector('.mount-path-input').value.trim();
+            const size = row.querySelector('.mount-size-input').value.trim();
+            const accessMode = row.querySelector('.mount-access-mode-select').value;
+            const storageClass = row.querySelector('.mount-storage-class-input').value.trim();
+
+            if (path) {
+                mounts.push({
+                    path,
+                    size,
+                    accessMode,
+                    storageClass
+                });
+            }
+        });
+
         return {
             name: document.getElementById('name').value.trim(),
             version: document.getElementById('version').value.trim(),
@@ -600,7 +714,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 name: document.getElementById('maintainerName').value.trim(),
                 email: document.getElementById('maintainerEmail').value.trim()
             },
-            // 添加工作负载类型
             workloadType: document.getElementById('workloadType').value,
             image: {
                 imageRegistry: document.getElementById('imageRegistry').value.trim(),
@@ -631,10 +744,7 @@ document.addEventListener('DOMContentLoaded', function () {
             },
             persistence: {
                 enabled: persistenceEnabled,
-                path: persistenceEnabled ? document.getElementById('path').value.trim() : '',
-                accessMode: persistenceEnabled ? document.getElementById('accessMode').value : '',
-                size: persistenceEnabled ? document.getElementById('size').value.trim() : '',
-                storageClass: persistenceEnabled ? document.getElementById('storageClass').value.trim() : ''
+                mounts: persistenceEnabled ? mounts : []
             },
             envVars: envVars
         };
@@ -716,6 +826,41 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
 
+        // 验证持久化存储配置
+        if (formData.persistence.enabled) {
+            if (formData.persistence.mounts.length === 0) {
+                alert('请至少添加一个挂载目录');
+                return false;
+            }
+
+            // 验证每个挂载点
+            for (const mount of formData.persistence.mounts) {
+                if (!mount.path) {
+                    alert('请填写挂载路径');
+                    return false;
+                }
+
+                if (!mount.size) {
+                    alert('请填写存储大小');
+                    return false;
+                }
+
+                const sizePattern = /^[0-9]+(Mi|Gi|Ti)$/;
+                if (!sizePattern.test(mount.size)) {
+                    alert('存储大小格式不正确，应为数字+Mi/Gi/Ti，例如1Gi');
+                    return false;
+                }
+            }
+
+            // 检查路径是否重复
+            const paths = formData.persistence.mounts.map(m => m.path);
+            const uniquePaths = [...new Set(paths)];
+            if (paths.length !== uniquePaths.length) {
+                alert('挂载路径不能重复');
+                return false;
+            }
+        }
+
         return true;
     }
 
@@ -777,7 +922,15 @@ document.addEventListener('DOMContentLoaded', function () {
                     "ephemeral-storage": formData.resources.requests["ephemeral-storage"] || "5Gi"
                 }
             },
-            persistence: formData.persistence
+            persistence: {
+                enabled: formData.persistence.enabled,
+                mounts: formData.persistence.mounts.map(mount => ({
+                    path: mount.path,
+                    accessMode: mount.accessMode,
+                    size: mount.size,
+                    storageClass: mount.storageClass
+                }))
+            }
         };
 
         // 处理环境变量 - 使用env1, env2这种格式
@@ -996,13 +1149,49 @@ document.addEventListener('DOMContentLoaded', function () {
         schema.properties.persistence = {
             "type": "object",
             "title": "持久化存储",
-            "required": ["enabled"],
+            "required": ["enabled", "mounts"],
             "properties": {
                 "enabled": {
                     "type": "boolean",
                     "title": "启用持久化存储",
                     "description": "是否启用持久化存储",
                     "default": true
+                },
+                "mounts": {
+                    "type": "array",
+                    "title": "挂载配置",
+                    "description": "持久化存储挂载配置",
+                    "items": {
+                        "type": "object",
+                        "required": ["path", "accessMode", "size", "storageClass"],
+                        "properties": {
+                            "path": {
+                                "type": "string",
+                                "title": "挂载路径",
+                                "description": "容器内挂载持久化存储的路径",
+                                "default": "/data"
+                            },
+                            "accessMode": {
+                                "type": "string",
+                                "title": "访问模式",
+                                "description": "持久化存储的访问模式",
+                                "enum": ["ReadWriteOnce", "ReadOnlyMany", "ReadWriteMany"],
+                                "default": "ReadWriteOnce"
+                            },
+                            "size": {
+                                "type": "string",
+                                "title": "存储大小",
+                                "description": "持久化存储的大小，例如1Gi",
+                                "default": "1Gi"
+                            },
+                            "storageClass": {
+                                "type": "string",
+                                "title": "存储类名称",
+                                "description": "Kubernetes存储类的名称",
+                                "default": "local"
+                            }
+                        }
+                    }
                 }
             }
         };
@@ -1103,6 +1292,23 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // 生成Deployment YAML
     function generateDeploymentYaml(formData) {
+        const volumeMounts = formData.persistence.enabled && formData.persistence.mounts.length > 0
+            ? `\n          volumeMounts:
+            {{- range $index, $mount := .Values.persistence.mounts }}
+            - name: data-{{ $index }}
+              mountPath: {{ $mount.path }}
+            {{- end }}`
+            : '';
+
+        const volumes = formData.persistence.enabled && formData.persistence.mounts.length > 0
+            ? `\n      volumes:
+        {{- range $index, $mount := .Values.persistence.mounts }}
+        - name: data-{{ $index }}
+          persistentVolumeClaim:
+            claimName: {{ include "${formData.name}.fullname" $ }}-{{ $index }}
+        {{- end }}`
+            : '';
+
         return `apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -1140,21 +1346,31 @@ spec:
           {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-          {{- if .Values.persistence.enabled }}
-          volumeMounts:
-            - name: data
-              mountPath: {{ .Values.persistence.path }}
+          {{- if and .Values.persistence.enabled .Values.persistence.mounts }}${volumeMounts}
           {{- end }}
-      {{- if .Values.persistence.enabled }}
-      volumes:
-        - name: data
-          persistentVolumeClaim:
-            claimName: {{ include "${formData.name}.fullname" . }}-pvc
+      {{- if and .Values.persistence.enabled .Values.persistence.mounts }}${volumes}
       {{- end }}`;
     }
 
     // 生成StatefulSet YAML
     function generateStatefulSetYaml(formData) {
+        const volumeMounts = formData.persistence.enabled && formData.persistence.mounts.length > 0
+            ? `\n          volumeMounts:
+            {{- range $index, $mount := .Values.persistence.mounts }}
+            - name: data-{{ $index }}
+              mountPath: {{ $mount.path }}
+            {{- end }}`
+            : '';
+
+        const volumes = formData.persistence.enabled && formData.persistence.mounts.length > 0
+            ? `\n      volumes:
+        {{- range $index, $mount := .Values.persistence.mounts }}
+        - name: data-{{ $index }}
+          persistentVolumeClaim:
+            claimName: {{ include "${formData.name}.fullname" $ }}-{{ $index }}
+        {{- end }}`
+            : '';
+
         return `apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -1193,16 +1409,9 @@ spec:
           {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-          {{- if .Values.persistence.enabled }}
-          volumeMounts:
-            - name: data
-              mountPath: {{ .Values.persistence.path }}
+          {{- if and .Values.persistence.enabled .Values.persistence.mounts }}${volumeMounts}
           {{- end }}
-      {{- if .Values.persistence.enabled }}
-      volumes:
-        - name: data
-          persistentVolumeClaim:
-            claimName: {{ include "${formData.name}.fullname" . }}-pvc
+      {{- if and .Values.persistence.enabled .Values.persistence.mounts }}${volumes}
       {{- end }}`;
     }
 
@@ -1231,22 +1440,25 @@ spec:
     function generatePvcYaml() {
         const formData = getFormData();
 
-        return `{{- if .Values.persistence.enabled }}
+        return `{{- if and .Values.persistence.enabled .Values.persistence.mounts }}
+{{- range $index, $mount := .Values.persistence.mounts }}
+---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ include "${formData.name}.fullname" . }}-pvc
+  name: {{ include "${formData.name}.fullname" $ }}-{{ $index }}
   labels:
-    {{- include "${formData.name}.labels" . | nindent 4 }}
+    {{- include "${formData.name}.labels" $ | nindent 4 }}
 spec:
   accessModes:
-    - {{ .Values.persistence.accessMode }}
+    - {{ $mount.accessMode }}
   resources:
     requests:
-      storage: {{ .Values.persistence.size }}
-  {{- if .Values.persistence.storageClass }}
-  storageClassName: {{ .Values.persistence.storageClass | quote }}
+      storage: {{ $mount.size }}
+  {{- if $mount.storageClass }}
+  storageClassName: {{ $mount.storageClass | quote }}
   {{- end }}
+{{- end }}
 {{- end }}`;
     }
 
@@ -1448,10 +1660,21 @@ helm install my-release ./${formData.name}
 
         // 重置持久化存储
         document.getElementById('persistenceEnabled').checked = true;
-        document.getElementById('path').value = '/data';
-        document.getElementById('accessMode').value = 'ReadWriteOnce';
-        document.getElementById('size').value = '1Gi';
-        document.getElementById('storageClass').value = 'local';
+
+        // 移除所有额外的挂载目录行
+        const mountRows = document.querySelectorAll('.persistence-mount-row');
+        for (let i = 1; i < mountRows.length; i++) {
+            mountRows[i].remove();
+        }
+
+        // 重置第一个挂载目录行
+        if (mountRows.length > 0) {
+            const firstMountRow = mountRows[0];
+            firstMountRow.querySelector('.mount-path-input').value = '/data';
+            firstMountRow.querySelector('.mount-size-input').value = '1Gi';
+            firstMountRow.querySelector('.mount-access-mode-select').value = 'ReadWriteOnce';
+            firstMountRow.querySelector('.mount-storage-class-input').value = 'local';
+        }
 
         // 移除所有额外的环境变量行
         const envRows = document.querySelectorAll('.env-row');
