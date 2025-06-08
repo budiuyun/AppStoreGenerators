@@ -227,8 +227,30 @@
                             <input type="checkbox" id="persistenceEnabled" checked>
                         </div>
                         <div class="persistence-settings">
+                            <div class="pvc-settings">
+                                <div class="form-group">
+                                    <label for="persistenceSize">存储大小 (例如: 1Gi)</label>
+                                    <input type="text" id="persistenceSize" placeholder="例如：1Gi" value="1Gi"
+                                        pattern="^[0-9]+(Mi|Gi|Ti)$">
+                                    <small class="form-note">可以是Mi/Gi/Ti单位</small>
+                                </div>
+                                <div class="form-group">
+                                    <label for="persistenceAccessMode">访问模式</label>
+                                    <select id="persistenceAccessMode">
+                                        <option value="ReadWriteOnce">ReadWriteOnce (单节点读写)</option>
+                                        <option value="ReadOnlyMany">ReadOnlyMany (多节点只读)</option>
+                                        <option value="ReadWriteMany">ReadWriteMany (多节点读写)</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="persistenceStorageClass">存储类名称</label>
+                                    <input type="text" id="persistenceStorageClass" placeholder="例如：local"
+                                        value="local">
+                                </div>
+                            </div>
+
                             <h4>挂载目录配置</h4>
-                            <p class="info">可配置多个挂载目录，为应用提供持久化存储</p>
+                            <p class="info">配置多个挂载路径，共用同一个持久卷</p>
 
                             <div id="persistence-mounts-container">
                                 <!-- 默认挂载目录配置行 -->
@@ -237,24 +259,6 @@
                                         <label>挂载路径</label>
                                         <input type="text" class="mount-path-input" placeholder="例如：/data"
                                             value="/data">
-                                    </div>
-                                    <div class="form-group mount-size">
-                                        <label>存储大小</label>
-                                        <input type="text" class="mount-size-input" placeholder="例如：1Gi" value="1Gi"
-                                            pattern="^[0-9]+(Mi|Gi|Ti)$">
-                                    </div>
-                                    <div class="form-group mount-access-mode">
-                                        <label>访问模式</label>
-                                        <select class="mount-access-mode-select">
-                                            <option value="ReadWriteOnce">ReadWriteOnce (单节点读写)</option>
-                                            <option value="ReadOnlyMany">ReadOnlyMany (多节点只读)</option>
-                                            <option value="ReadWriteMany">ReadWriteMany (多节点读写)</option>
-                                        </select>
-                                    </div>
-                                    <div class="form-group mount-storage-class">
-                                        <label>存储类</label>
-                                        <input type="text" class="mount-storage-class-input" placeholder="例如：local"
-                                            value="local">
                                     </div>
                                     <button type="button" class="remove-mount">删除</button>
                                 </div>
