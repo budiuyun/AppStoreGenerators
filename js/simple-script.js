@@ -289,6 +289,9 @@ document.addEventListener('DOMContentLoaded', function () {
             if (normalizedData.persistence.size) document.getElementById('persistenceSize').value = normalizedData.persistence.size;
             if (normalizedData.persistence.accessmode) document.getElementById('persistenceAccessMode').value = normalizedData.persistence.accessmode;
             if (normalizedData.persistence.storageclass) document.getElementById('persistenceStorageClass').value = normalizedData.persistence.storageclass;
+            // 添加对大小写的处理
+            if (normalizedData.persistence.accessMode) document.getElementById('persistenceAccessMode').value = normalizedData.persistence.accessMode;
+            if (normalizedData.persistence.storageClass) document.getElementById('persistenceStorageClass').value = normalizedData.persistence.storageClass;
 
             // 处理挂载路径列表
             if (normalizedData.persistence.mounts && Array.isArray(normalizedData.persistence.mounts)) {
