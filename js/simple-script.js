@@ -285,15 +285,26 @@ document.addEventListener('DOMContentLoaded', function () {
             document.querySelector('.persistence-settings').style.display =
                 document.getElementById('persistenceEnabled').checked ? 'block' : 'none';
 
-            // 处理多挂载点
+            // 设置持久卷全局属性
+            if (normalizedData.persistence.size) document.getElementById('persistenceSize').value = normalizedData.persistence.size;
+            if (normalizedData.persistence.accessmode) document.getElementById('persistenceAccessMode').value = normalizedData.persistence.accessmode;
+            if (normalizedData.persistence.storageclass) document.getElementById('persistenceStorageClass').value = normalizedData.persistence.storageclass;
+
+            // 处理挂载路径列表
             if (normalizedData.persistence.mounts && Array.isArray(normalizedData.persistence.mounts)) {
                 // 清除现有挂载点
                 const mountContainer = document.getElementById('persistence-mounts-container');
                 mountContainer.innerHTML = '';
 
-                // 添加挂载点
+                // 添加挂载点 - 检查是否是路径字符串数组还是对象数组
                 normalizedData.persistence.mounts.forEach(mount => {
-                    addMountRow(mount.path);
+                    if (typeof mount === 'string') {
+                        // 如果是字符串数组，直接作为路径添加
+                        addMountRow(mount);
+                    } else if (typeof mount === 'object' && mount.path) {
+                        // 如果是对象数组，提取路径添加
+                        addMountRow(mount.path);
+                    }
                 });
 
                 // 确保至少有一个挂载目录行
@@ -1124,7 +1135,7 @@ document.addEventListener('DOMContentLoaded', function () {
         schema.properties.persistence = {
             "type": "object",
             "title": "持久化存储",
-            "required": ["enabled"],
+            "required": ["enabled", "size", "accessMode", "storageClass", "mounts"],
             "properties": {
                 "enabled": {
                     "type": "boolean",
