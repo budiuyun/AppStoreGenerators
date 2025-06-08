@@ -1139,7 +1139,26 @@ spec:
             {{- end }}
           {{- end }}
           resources:
-            {{- toYaml .Values.resources | nindent 12 }}
+            limits:
+              {{- if .Values.resources.limits.cpu }}
+              cpu: {{ .Values.resources.limits.cpu | quote }}
+              {{- end }}
+              {{- if .Values.resources.limits.memory }}
+              memory: {{ .Values.resources.limits.memory | quote }}
+              {{- end }}
+              {{- if hasKey .Values.resources.limits "ephemeral-storage" }}
+              ephemeral-storage: {{ index .Values.resources.limits "ephemeral-storage" | quote }}
+              {{- end }}
+            requests:
+              {{- if .Values.resources.requests.cpu }}
+              cpu: {{ .Values.resources.requests.cpu | quote }}
+              {{- end }}
+              {{- if .Values.resources.requests.memory }}
+              memory: {{ .Values.resources.requests.memory | quote }}
+              {{- end }}
+              {{- if hasKey .Values.resources.requests "ephemeral-storage" }}
+              ephemeral-storage: {{ index .Values.resources.requests "ephemeral-storage" | quote }}
+              {{- end }}
           {{- if .Values.persistence.enabled }}
           volumeMounts:
             - name: data
@@ -1192,7 +1211,26 @@ spec:
             {{- end }}
           {{- end }}
           resources:
-            {{- toYaml .Values.resources | nindent 12 }}
+            limits:
+              {{- if .Values.resources.limits.cpu }}
+              cpu: {{ .Values.resources.limits.cpu | quote }}
+              {{- end }}
+              {{- if .Values.resources.limits.memory }}
+              memory: {{ .Values.resources.limits.memory | quote }}
+              {{- end }}
+              {{- if hasKey .Values.resources.limits "ephemeral-storage" }}
+              ephemeral-storage: {{ index .Values.resources.limits "ephemeral-storage" | quote }}
+              {{- end }}
+            requests:
+              {{- if .Values.resources.requests.cpu }}
+              cpu: {{ .Values.resources.requests.cpu | quote }}
+              {{- end }}
+              {{- if .Values.resources.requests.memory }}
+              memory: {{ .Values.resources.requests.memory | quote }}
+              {{- end }}
+              {{- if hasKey .Values.resources.requests "ephemeral-storage" }}
+              ephemeral-storage: {{ index .Values.resources.requests "ephemeral-storage" | quote }}
+              {{- end }}
           {{- if .Values.persistence.enabled }}
           volumeMounts:
             - name: data
