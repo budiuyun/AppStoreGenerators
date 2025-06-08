@@ -39,7 +39,22 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             const jsonData = JSON.parse(jsonText);
+            console.log("解析的JSON数据:", jsonData);
+
+            // 检查持久化挂载路径
+            if (jsonData.persistence && jsonData.persistence.mounts) {
+                console.log("准备填充挂载路径:", jsonData.persistence.mounts);
+            }
+
             fillFormFromJson(jsonData);
+
+            // 再次检查挂载路径是否正确填充
+            const mountRows = document.querySelectorAll('.persistence-mount-row');
+            console.log("填充后的挂载路径数量:", mountRows.length);
+            mountRows.forEach((row, index) => {
+                const pathInput = row.querySelector('.mount-path-input');
+                console.log(`挂载路径 ${index + 1}:`, pathInput.value);
+            });
 
             // 切换到基本信息标签页
             document.querySelector('.tab-btn[data-tab="basic"]').click();
@@ -124,6 +139,30 @@ document.addEventListener('DOMContentLoaded', function () {
         };
 
         jsonInput.value = JSON.stringify(exampleConfig, null, 2);
+
+        // 自动应用示例配置到表单
+        console.log("应用示例配置，挂载路径:", exampleConfig.persistence.mounts);
+        fillFormFromJson(exampleConfig);
+
+        // 检查挂载路径是否正确填充
+        const mountRows = document.querySelectorAll('.persistence-mount-row');
+        console.log("挂载路径行数:", mountRows.length);
+
+        // 如果挂载路径没有正确填充，手动填充
+        if (mountRows.length !== exampleConfig.persistence.mounts.length) {
+            console.log("需要手动填充挂载路径");
+
+            // 清除现有挂载点
+            const mountContainer = document.getElementById('persistence-mounts-container');
+            mountContainer.innerHTML = '';
+
+            // 手动添加每个路径
+            exampleConfig.persistence.mounts.forEach(path => {
+                addMountRow(path);
+            });
+        }
+
+        alert('示例配置已应用到表单');
     });
 
     // 清空按钮
@@ -168,9 +207,15 @@ document.addEventListener('DOMContentLoaded', function () {
                 const value = obj[key];
 
                 if (Array.isArray(value)) {
-                    normalized[lowerKey] = value.map(item =>
-                        typeof item === 'object' && item !== null ? normalizeData(item) : item
-                    );
+                    // 特殊处理挂载路径数组
+                    if (lowerKey === 'mounts') {
+                        console.log("正在处理mounts数组:", value);
+                        normalized[lowerKey] = value; // 保持原样，不做转换
+                    } else {
+                        normalized[lowerKey] = value.map(item =>
+                            typeof item === 'object' && item !== null ? normalizeData(item) : item
+                        );
+                    }
                 } else if (typeof value === 'object' && value !== null) {
                     normalized[lowerKey] = normalizeData(value);
                 } else {
@@ -304,16 +349,20 @@ document.addEventListener('DOMContentLoaded', function () {
             mountContainer.innerHTML = '';
 
             if (normalizedData.persistence.mounts) {
+                console.log("找到挂载路径配置:", normalizedData.persistence.mounts);
                 // 检查mounts字段的类型并适当处理
                 if (Array.isArray(normalizedData.persistence.mounts)) {
                     // 如果是数组，遍历处理每个元素
                     normalizedData.persistence.mounts.forEach(mount => {
+                        console.log("处理挂载点:", mount);
                         if (typeof mount === 'string') {
                             // 如果是字符串数组，直接作为路径添加
+                            console.log("添加字符串路径:", mount);
                             addMountRow(mount);
                         } else if (typeof mount === 'object' && mount !== null) {
                             // 如果是对象数组，检查path字段
                             if (mount.path) {
+                                console.log("添加对象路径:", mount.path);
                                 addMountRow(mount.path);
                             }
                         }
@@ -438,14 +487,18 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // 辅助函数：添加挂载目录行
     function addMountRow(path) {
+        console.log("调用addMountRow添加路径:", path);
         const mountContainer = document.getElementById('persistence-mounts-container');
         const mountRow = document.createElement('div');
         mountRow.className = 'persistence-mount-row';
 
+        // 确保path有值，如果没有则使用默认值
+        const pathValue = path && typeof path === 'string' ? path : '/data';
+
         mountRow.innerHTML = `
             <div class="form-group mount-path">
                 <label>挂载路径</label>
-                <input type="text" class="mount-path-input" placeholder="例如：/data" value="${path || '/data'}">
+                <input type="text" class="mount-path-input" placeholder="例如：/data" value="${pathValue}">
             </div>
             <button type="button" class="remove-mount">删除</button>
         `;
@@ -461,6 +514,9 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             mountRow.remove();
         });
+
+        // 确认路径已正确设置
+        console.log("挂载路径已设置为:", mountRow.querySelector('.mount-path-input').value);
     }
 
     // 预览标签页切换
