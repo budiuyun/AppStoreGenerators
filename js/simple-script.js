@@ -220,6 +220,12 @@ document.addEventListener('DOMContentLoaded', function () {
             if (workloadType === 'deployment' || workloadType === 'statefulset') {
                 document.getElementById('workloadType').value = workloadType.charAt(0).toUpperCase() + workloadType.slice(1);
             }
+        } else if (normalizedData.workloadType) {
+            // 处理大小写匹配
+            const workloadType = normalizedData.workloadType;
+            if (workloadType === 'Deployment' || workloadType === 'StatefulSet') {
+                document.getElementById('workloadType').value = workloadType;
+            }
         }
 
         // 镜像信息
@@ -294,31 +300,42 @@ document.addEventListener('DOMContentLoaded', function () {
             if (normalizedData.persistence.storageClass) document.getElementById('persistenceStorageClass').value = normalizedData.persistence.storageClass;
 
             // 处理挂载路径列表
-            if (normalizedData.persistence.mounts && Array.isArray(normalizedData.persistence.mounts)) {
-                // 清除现有挂载点
-                const mountContainer = document.getElementById('persistence-mounts-container');
-                mountContainer.innerHTML = '';
+            const mountContainer = document.getElementById('persistence-mounts-container');
+            mountContainer.innerHTML = '';
 
-                // 添加挂载点 - 检查是否是路径字符串数组还是对象数组
-                normalizedData.persistence.mounts.forEach(mount => {
-                    if (typeof mount === 'string') {
-                        // 如果是字符串数组，直接作为路径添加
-                        addMountRow(mount);
-                    } else if (typeof mount === 'object' && mount.path) {
-                        // 如果是对象数组，提取路径添加
-                        addMountRow(mount.path);
-                    }
-                });
-
-                // 确保至少有一个挂载目录行
-                if (document.querySelectorAll('.persistence-mount-row').length === 0) {
-                    addMountRow('/data');
+            if (normalizedData.persistence.mounts) {
+                // 检查mounts字段的类型并适当处理
+                if (Array.isArray(normalizedData.persistence.mounts)) {
+                    // 如果是数组，遍历处理每个元素
+                    normalizedData.persistence.mounts.forEach(mount => {
+                        if (typeof mount === 'string') {
+                            // 如果是字符串数组，直接作为路径添加
+                            addMountRow(mount);
+                        } else if (typeof mount === 'object' && mount !== null) {
+                            // 如果是对象数组，检查path字段
+                            if (mount.path) {
+                                addMountRow(mount.path);
+                            }
+                        }
+                    });
+                } else if (typeof normalizedData.persistence.mounts === 'object') {
+                    // 如果mounts是一个对象，尝试提取其中的路径
+                    Object.values(normalizedData.persistence.mounts).forEach(value => {
+                        if (typeof value === 'string') {
+                            addMountRow(value);
+                        } else if (typeof value === 'object' && value !== null && value.path) {
+                            addMountRow(value.path);
+                        }
+                    });
                 }
             } else if (normalizedData.persistence.path) {
                 // 旧版格式兼容，将单个挂载点转换为多挂载点
-                const mountContainer = document.getElementById('persistence-mounts-container');
-                mountContainer.innerHTML = '';
                 addMountRow(normalizedData.persistence.path);
+            }
+
+            // 确保至少有一个挂载目录行
+            if (document.querySelectorAll('.persistence-mount-row').length === 0) {
+                addMountRow('/data');
             }
         }
 
