@@ -92,20 +92,18 @@ document.addEventListener('DOMContentLoaded', function () {
             },
             "service": {
                 "type": "ClusterIP",
-                "ports": {
-                    "http": {
+                "ports": [
+                    {
+                        "name": "http",
                         "port": 80,
                         "protocol": "TCP"
                     },
-                    "https": {
+                    {
+                        "name": "https",
                         "port": 443,
                         "protocol": "TCP"
-                    },
-                    "dns": {
-                        "port": 53,
-                        "protocol": "UDP"
                     }
-                }
+                ]
             },
             "networkLimits": {
                 "enabled": true,
@@ -302,19 +300,19 @@ document.addEventListener('DOMContentLoaded', function () {
             // 添加端口
             if (normalizedData.service.ports && Array.isArray(normalizedData.service.ports)) {
                 normalizedData.service.ports.forEach(port => {
-                    addPortRow(port.name, port.port, port.protocol);
+                    addPortRow(port.name, port.port, port.protocol || 'TCP');
                 });
             } else if (normalizedData.service.ports && typeof normalizedData.service.ports === 'object') {
-                // 处理对象格式的端口
-                Object.entries(normalizedData.service.ports).forEach(([name, portConfig]) => {
-                    if (typeof portConfig === 'object' && portConfig !== null) {
-                        // 如果是对象，获取port和protocol属性
-                        const port = portConfig.port !== undefined ? portConfig.port : portConfig;
-                        const protocol = portConfig.protocol || 'TCP';
+                // 处理对象格式的端口（向后兼容）
+                Object.entries(normalizedData.service.ports).forEach(([name, value]) => {
+                    if (typeof value === 'object' && value !== null) {
+                        // 如果值是对象，尝试提取端口号和协议
+                        const port = value.port || value;
+                        const protocol = value.protocol || 'TCP';
                         addPortRow(name, port, protocol);
                     } else {
-                        // 如果是数字，只有端口号
-                        addPortRow(name, portConfig, 'TCP'); // 默认使用TCP协议
+                        // 如果值是数字，默认使用TCP协议
+                        addPortRow(name, value, 'TCP');
                     }
                 });
             }
@@ -438,13 +436,10 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // 辅助函数：添加端口行
-    function addPortRow(name, port, protocol) {
+    function addPortRow(name, port, protocol = 'TCP') {
         const portContainer = document.getElementById('service-ports-container');
         const portRow = document.createElement('div');
         portRow.className = 'service-port-row';
-
-        // 设置默认协议为TCP
-        protocol = protocol || 'TCP';
 
         portRow.innerHTML = `
             <div class="form-group port-name">
@@ -621,7 +616,7 @@ document.addEventListener('DOMContentLoaded', function () {
             <div class="form-group port-protocol">
                 <label>协议</label>
                 <select class="port-protocol-select">
-                    <option value="TCP" selected>TCP</option>
+                    <option value="TCP">TCP</option>
                     <option value="UDP">UDP</option>
                 </select>
             </div>
@@ -633,10 +628,6 @@ document.addEventListener('DOMContentLoaded', function () {
         // 添加删除端口的事件监听
         const removeBtn = portRow.querySelector('.remove-port');
         removeBtn.addEventListener('click', () => {
-            if (document.querySelectorAll('.service-port-row').length <= 1) {
-                alert('至少需要一个服务端口！');
-                return;
-            }
             portRow.remove();
         });
     });
@@ -997,15 +988,6 @@ document.addEventListener('DOMContentLoaded', function () {
     function generateValuesYaml() {
         const formData = getFormData();
 
-        // 创建端口对象
-        const servicePorts = {};
-        formData.service.ports.forEach(port => {
-            servicePorts[port.name] = {
-                port: port.port,
-                protocol: port.protocol
-            };
-        });
-
         const values = {
             workloadType: formData.workloadType,
             replicaCount: 1,
@@ -1013,11 +995,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 imageRegistry: formData.image.imageRegistry,
                 repository: formData.image.repository,
                 tag: formData.image.tag,
-                pullPolicy: formData.image.pullPolicy11
+                pullPolicy: formData.image.pullPolicy
             },
             service: {
                 type: formData.service.type,
-                ports: servicePorts
+                ports: formData.service.ports
             },
             networkLimits: formData.networkLimits,
             resources: {
@@ -1137,49 +1119,48 @@ document.addEventListener('DOMContentLoaded', function () {
                             "default": "ClusterIP"
                         },
                         "ports": {
-                            "type": "object",
+                            "type": "array",
                             "title": "服务端口配置",
-                            "description": "服务暴露的端口配置，键为端口名称，值为端口配置对象",
-                            "patternProperties": {
-                                "^.*$": {
-                                    "type": "object",
-                                    "title": "端口配置",
-                                    "description": "服务端口配置",
-                                    "properties": {
-                                        "port": {
-                                            "type": "integer",
-                                            "title": "端口号",
-                                            "description": "服务端口号",
-                                            "minimum": 1,
-                                            "maximum": 65535
-                                        },
-                                        "protocol": {
-                                            "type": "string",
-                                            "title": "协议",
-                                            "description": "端口使用的协议",
-                                            "enum": ["TCP", "UDP"],
-                                            "default": "TCP"
-                                        }
+                            "description": "服务暴露的端口配置",
+                            "items": {
+                                "type": "object",
+                                "title": "端口配置",
+                                "required": ["name", "port", "protocol"],
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "title": "端口名称",
+                                        "description": "服务端口名称"
                                     },
-                                    "required": ["port", "protocol"]
+                                    "port": {
+                                        "type": "integer",
+                                        "title": "端口号",
+                                        "description": "服务端口号",
+                                        "minimum": 1,
+                                        "maximum": 65535
+                                    },
+                                    "protocol": {
+                                        "type": "string",
+                                        "title": "协议",
+                                        "description": "端口协议",
+                                        "enum": ["TCP", "UDP"],
+                                        "default": "TCP"
+                                    }
                                 }
                             },
-                            "additionalProperties": false,
                             "examples": [
-                                {
-                                    "http": {
+                                [
+                                    {
+                                        "name": "http",
                                         "port": 80,
                                         "protocol": "TCP"
                                     },
-                                    "https": {
+                                    {
+                                        "name": "https",
                                         "port": 443,
                                         "protocol": "TCP"
-                                    },
-                                    "dns": {
-                                        "port": 53,
-                                        "protocol": "UDP"
                                     }
-                                }
+                                ]
                             ]
                         }
                     }
@@ -1424,10 +1405,10 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           {{- if .Values.service.ports }}
           ports:
-            {{- range $name, $portConfig := .Values.service.ports }}
-            - name: {{ $name }}
-              containerPort: {{ $portConfig.port }}
-              protocol: {{ $portConfig.protocol }}
+            {{- range .Values.service.ports }}
+            - name: {{ .name }}
+              containerPort: {{ .port }}
+              protocol: {{ .protocol }}
             {{- end }}
           {{- end }}
           {{- if .Values.env }}
@@ -1485,10 +1466,10 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           {{- if .Values.service.ports }}
           ports:
-            {{- range $name, $portConfig := .Values.service.ports }}
-            - name: {{ $name }}
-              containerPort: {{ $portConfig.port }}
-              protocol: {{ $portConfig.protocol }}
+            {{- range .Values.service.ports }}
+            - name: {{ .name }}
+              containerPort: {{ .port }}
+              protocol: {{ .protocol }}
             {{- end }}
           {{- end }}
           {{- if .Values.env }}
@@ -1518,11 +1499,11 @@ metadata:
 spec:
   type: {{ .Values.service.type }}
   ports:
-    {{- range $name, $portConfig := .Values.service.ports }}
-    - port: {{ $portConfig.port }}
-      targetPort: {{ $portConfig.port }}
-      protocol: {{ $portConfig.protocol }}
-      name: {{ $name }}
+    {{- range .Values.service.ports }}
+    - port: {{ .port }}
+      targetPort: {{ .port }}
+      protocol: {{ .protocol }}
+      name: {{ .name }}
     {{- end }}
   selector: {{- include "${formData.name}.selectorLabels" . | nindent 4 }}`;
     }
