@@ -41,6 +41,14 @@ document.addEventListener('DOMContentLoaded', function () {
             const jsonData = JSON.parse(jsonText);
             console.log("解析的JSON数据:", jsonData);
 
+            // 检查端口配置格式
+            if (jsonData.service && jsonData.service.ports) {
+                console.log("服务端口配置格式:", typeof jsonData.service.ports, jsonData.service.ports);
+                if (typeof jsonData.service.ports === 'object' && !Array.isArray(jsonData.service.ports)) {
+                    console.log("端口是对象格式，将进行适配处理");
+                }
+            }
+
             // 检查持久化挂载路径
             if (jsonData.persistence && jsonData.persistence.mounts) {
                 console.log("准备填充挂载路径:", jsonData.persistence.mounts);
@@ -92,18 +100,16 @@ document.addEventListener('DOMContentLoaded', function () {
             },
             "service": {
                 "type": "ClusterIP",
-                "ports": [
-                    {
-                        "name": "http",
+                "ports": {
+                    "http": {
                         "port": 80,
                         "protocol": "TCP"
                     },
-                    {
-                        "name": "https",
+                    "https": {
                         "port": 443,
                         "protocol": "TCP"
                     }
-                ]
+                }
             },
             "networkLimits": {
                 "enabled": true,
@@ -298,23 +304,26 @@ document.addEventListener('DOMContentLoaded', function () {
             portContainer.innerHTML = '';
 
             // 添加端口
-            if (normalizedData.service.ports && Array.isArray(normalizedData.service.ports)) {
-                normalizedData.service.ports.forEach(port => {
-                    addPortRow(port.name, port.port, port.protocol || 'TCP');
-                });
-            } else if (normalizedData.service.ports && typeof normalizedData.service.ports === 'object') {
-                // 处理对象格式的端口（向后兼容）
-                Object.entries(normalizedData.service.ports).forEach(([name, value]) => {
-                    if (typeof value === 'object' && value !== null) {
-                        // 如果值是对象，尝试提取端口号和协议
-                        const port = value.port || value;
-                        const protocol = value.protocol || 'TCP';
-                        addPortRow(name, port, protocol);
-                    } else {
-                        // 如果值是数字，默认使用TCP协议
-                        addPortRow(name, value, 'TCP');
-                    }
-                });
+            if (normalizedData.service.ports) {
+                if (Array.isArray(normalizedData.service.ports)) {
+                    // 如果是数组格式
+                    normalizedData.service.ports.forEach(port => {
+                        addPortRow(port.name, port.port, port.protocol || 'TCP');
+                    });
+                } else if (typeof normalizedData.service.ports === 'object') {
+                    // 处理对象格式的端口
+                    Object.entries(normalizedData.service.ports).forEach(([name, value]) => {
+                        if (typeof value === 'object' && value !== null) {
+                            // 如果值是对象，尝试提取端口号和协议
+                            const port = value.port || value;
+                            const protocol = value.protocol || 'TCP';
+                            addPortRow(name, port, protocol);
+                        } else {
+                            // 如果值是数字，默认使用TCP协议
+                            addPortRow(name, value, 'TCP');
+                        }
+                    });
+                }
             }
 
             // 确保至少有一个端口
@@ -752,14 +761,18 @@ document.addEventListener('DOMContentLoaded', function () {
             category = customCategoryInput.value.trim();
         }
 
-        // 收集服务端口
+        // 收集服务端口 - 支持两种格式
         const servicePorts = [];
+        const servicePortsObj = {};
         document.querySelectorAll('.service-port-row').forEach(row => {
             const name = row.querySelector('.port-name-input').value.trim();
             const port = parseInt(row.querySelector('.port-number-input').value);
             const protocol = row.querySelector('.port-protocol-select').value;
             if (name && !isNaN(port)) {
+                // 数组格式
                 servicePorts.push({ name, port, protocol });
+                // 对象格式 (用于JSON导出)
+                servicePortsObj[name] = { port, protocol };
             }
         });
 
@@ -784,6 +797,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
 
+        // 导出JSON时使用对象格式的ports，这样与用户提供的JSON格式一致
         return {
             name: document.getElementById('name').value.trim(),
             version: document.getElementById('version').value.trim(),
@@ -804,7 +818,7 @@ document.addEventListener('DOMContentLoaded', function () {
             },
             service: {
                 type: document.getElementById('serviceType').value,
-                ports: servicePorts
+                ports: servicePortsObj // 使用对象格式的ports
             },
             networkLimits: {
                 enabled: networkEnabled,
@@ -988,6 +1002,20 @@ document.addEventListener('DOMContentLoaded', function () {
     function generateValuesYaml() {
         const formData = getFormData();
 
+        // 确保服务端口是数组格式
+        const servicePorts = [];
+        if (formData.service && formData.service.ports) {
+            // 将端口转换为数组格式
+            document.querySelectorAll('.service-port-row').forEach(row => {
+                const name = row.querySelector('.port-name-input').value.trim();
+                const port = parseInt(row.querySelector('.port-number-input').value);
+                const protocol = row.querySelector('.port-protocol-select').value;
+                if (name && !isNaN(port)) {
+                    servicePorts.push({ name, port, protocol });
+                }
+            });
+        }
+
         const values = {
             workloadType: formData.workloadType,
             replicaCount: 1,
@@ -999,7 +1027,7 @@ document.addEventListener('DOMContentLoaded', function () {
             },
             service: {
                 type: formData.service.type,
-                ports: formData.service.ports
+                ports: servicePorts
             },
             networkLimits: formData.networkLimits,
             resources: {
