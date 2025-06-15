@@ -301,20 +301,25 @@ document.addEventListener('DOMContentLoaded', function () {
 
             // 添加端口
             if (normalizedData.service.ports && Array.isArray(normalizedData.service.ports)) {
+                console.log("处理数组格式的端口:", normalizedData.service.ports);
                 normalizedData.service.ports.forEach(port => {
                     addPortRow(port.name, port.port, port.protocol);
                 });
             } else if (normalizedData.service.ports && typeof normalizedData.service.ports === 'object') {
                 // 处理对象格式的端口
+                console.log("处理对象格式的端口:", normalizedData.service.ports);
                 Object.entries(normalizedData.service.ports).forEach(([name, portValue]) => {
                     // 处理不同格式的端口配置
+                    console.log(`处理端口 ${name}:`, portValue, typeof portValue);
                     if (typeof portValue === 'object') {
                         // 如果是对象，尝试提取port和protocol属性
                         const port = portValue.port || portValue;
                         const protocol = portValue.protocol || 'TCP';
+                        console.log(`端口 ${name} 解析为:`, port, protocol);
                         addPortRow(name, port, protocol);
                     } else {
                         // 如果是简单的数字，默认使用TCP协议
+                        console.log(`端口 ${name} 是简单数字:`, portValue);
                         addPortRow(name, portValue, 'TCP');
                     }
                 });
@@ -807,7 +812,13 @@ document.addEventListener('DOMContentLoaded', function () {
             },
             service: {
                 type: document.getElementById('serviceType').value,
-                ports: servicePorts
+                ports: servicePorts.reduce((obj, port) => {
+                    obj[port.name] = {
+                        port: port.port,
+                        protocol: port.protocol
+                    };
+                    return obj;
+                }, {})
             },
             networkLimits: {
                 enabled: networkEnabled,
