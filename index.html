@@ -148,7 +148,7 @@
 
                     <div class="service-ports-section">
                         <h3>服务端口配置</h3>
-                        <p class="info">可配置多个服务端口，每个端口需指定名称和端口号</p>
+                        <p class="info">可配置多个服务端口，每个端口需指定名称、端口号和协议</p>
 
                         <div id="service-ports-container">
                             <!-- 默认端口配置行 -->
@@ -160,6 +160,13 @@
                                 <div class="form-group port-number">
                                     <label>端口号</label>
                                     <input type="number" class="port-number-input" min="1" max="65535" value="80">
+                                </div>
+                                <div class="form-group port-protocol">
+                                    <label>协议</label>
+                                    <select class="port-protocol-select">
+                                        <option value="TCP">TCP</option>
+                                        <option value="UDP">UDP</option>
+                                    </select>
                                 </div>
                                 <button type="button" class="remove-port">删除</button>
                             </div>

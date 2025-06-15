@@ -292,12 +292,21 @@ document.addEventListener('DOMContentLoaded', function () {
             // 添加端口
             if (normalizedData.service.ports && Array.isArray(normalizedData.service.ports)) {
                 normalizedData.service.ports.forEach(port => {
-                    addPortRow(port.name, port.port);
+                    addPortRow(port.name, port.port, port.protocol);
                 });
             } else if (normalizedData.service.ports && typeof normalizedData.service.ports === 'object') {
                 // 处理对象格式的端口
-                Object.entries(normalizedData.service.ports).forEach(([name, port]) => {
-                    addPortRow(name, port);
+                Object.entries(normalizedData.service.ports).forEach(([name, portValue]) => {
+                    // 处理不同格式的端口配置
+                    if (typeof portValue === 'object') {
+                        // 如果是对象，尝试提取port和protocol属性
+                        const port = portValue.port || portValue;
+                        const protocol = portValue.protocol || 'TCP';
+                        addPortRow(name, port, protocol);
+                    } else {
+                        // 如果是简单的数字，默认使用TCP协议
+                        addPortRow(name, portValue, 'TCP');
+                    }
                 });
             }
 
@@ -420,7 +429,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // 辅助函数：添加端口行
-    function addPortRow(name, port) {
+    function addPortRow(name, port, protocol = 'TCP') {
         const portContainer = document.getElementById('service-ports-container');
         const portRow = document.createElement('div');
         portRow.className = 'service-port-row';
@@ -433,6 +442,13 @@ document.addEventListener('DOMContentLoaded', function () {
             <div class="form-group port-number">
                 <label>端口号</label>
                 <input type="number" class="port-number-input" min="1" max="65535" value="${port || 80}">
+            </div>
+            <div class="form-group port-protocol">
+                <label>协议</label>
+                <select class="port-protocol-select">
+                    <option value="TCP" ${protocol === 'TCP' ? 'selected' : ''}>TCP</option>
+                    <option value="UDP" ${protocol === 'UDP' ? 'selected' : ''}>UDP</option>
+                </select>
             </div>
             <button type="button" class="remove-port">删除</button>
         `;
@@ -590,6 +606,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 <label>端口号</label>
                 <input type="number" class="port-number-input" min="1" max="65535" value="80">
             </div>
+            <div class="form-group port-protocol">
+                <label>协议</label>
+                <select class="port-protocol-select">
+                    <option value="TCP">TCP</option>
+                    <option value="UDP">UDP</option>
+                </select>
+            </div>
             <button type="button" class="remove-port">删除</button>
         `;
 
@@ -727,8 +750,9 @@ document.addEventListener('DOMContentLoaded', function () {
         document.querySelectorAll('.service-port-row').forEach(row => {
             const name = row.querySelector('.port-name-input').value.trim();
             const port = parseInt(row.querySelector('.port-number-input').value);
+            const protocol = row.querySelector('.port-protocol-select').value;
             if (name && !isNaN(port)) {
-                servicePorts.push({ name, port });
+                servicePorts.push({ name, port, protocol });
             }
         });
 
@@ -969,7 +993,10 @@ document.addEventListener('DOMContentLoaded', function () {
             service: {
                 type: formData.service.type,
                 ports: formData.service.ports.reduce((obj, port) => {
-                    obj[port.name] = port.port;
+                    obj[port.name] = {
+                        port: port.port,
+                        protocol: port.protocol
+                    };
                     return obj;
                 }, {})
             },
@@ -1093,22 +1120,46 @@ document.addEventListener('DOMContentLoaded', function () {
                         "ports": {
                             "type": "object",
                             "title": "服务端口配置",
-                            "description": "服务暴露的端口配置，键为端口名称，值为端口号",
+                            "description": "服务暴露的端口配置，键为端口名称，值为端口配置对象",
                             "patternProperties": {
                                 "^.*$": {
-                                    "type": "integer",
-                                    "title": "端口号",
-                                    "description": "服务端口号",
-                                    "minimum": 1,
-                                    "maximum": 65535
+                                    "type": "object",
+                                    "title": "端口配置",
+                                    "description": "服务端口配置",
+                                    "properties": {
+                                        "port": {
+                                            "type": "integer",
+                                            "title": "端口号",
+                                            "description": "服务端口号",
+                                            "minimum": 1,
+                                            "maximum": 65535
+                                        },
+                                        "protocol": {
+                                            "type": "string",
+                                            "title": "协议",
+                                            "description": "服务端口协议",
+                                            "enum": ["TCP", "UDP"],
+                                            "default": "TCP"
+                                        }
+                                    },
+                                    "required": ["port", "protocol"]
                                 }
                             },
                             "additionalProperties": false,
                             "examples": [
                                 {
-                                    "http": 80,
-                                    "https": 443,
-                                    "metrics": 8080
+                                    "http": {
+                                        "port": 80,
+                                        "protocol": "TCP"
+                                    },
+                                    "https": {
+                                        "port": 443,
+                                        "protocol": "TCP"
+                                    },
+                                    "udp-service": {
+                                        "port": 9090,
+                                        "protocol": "UDP"
+                                    }
                                 }
                             ]
                         }
@@ -1354,10 +1405,10 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           {{- if .Values.service.ports }}
           ports:
-            {{- range $name, $port := .Values.service.ports }}
+            {{- range $name, $portConfig := .Values.service.ports }}
             - name: {{ $name }}
-              containerPort: {{ $port }}
-              protocol: TCP
+              containerPort: {{ $portConfig.port }}
+              protocol: {{ $portConfig.protocol }}
             {{- end }}
           {{- end }}
           {{- if .Values.env }}
@@ -1415,10 +1466,10 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           {{- if .Values.service.ports }}
           ports:
-            {{- range $name, $port := .Values.service.ports }}
+            {{- range $name, $portConfig := .Values.service.ports }}
             - name: {{ $name }}
-              containerPort: {{ $port }}
-              protocol: TCP
+              containerPort: {{ $portConfig.port }}
+              protocol: {{ $portConfig.protocol }}
             {{- end }}
           {{- end }}
           {{- if .Values.env }}
@@ -1448,10 +1499,10 @@ metadata:
 spec:
   type: {{ .Values.service.type }}
   ports:
-    {{- range $name, $port := .Values.service.ports }}
-    - port: {{ $port }}
-      targetPort: {{ $port }}
-      protocol: TCP
+    {{- range $name, $portConfig := .Values.service.ports }}
+    - port: {{ $portConfig.port }}
+      targetPort: {{ $portConfig.port }}
+      protocol: {{ $portConfig.protocol }}
       name: {{ $name }}
     {{- end }}
   selector: {{- include "${formData.name}.selectorLabels" . | nindent 4 }}`;
