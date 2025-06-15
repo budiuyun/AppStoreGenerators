@@ -101,7 +101,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         "port": 443,
                         "protocol": "TCP"
                     },
-                    "dns-udp": {
+                    "dns": {
                         "port": 53,
                         "protocol": "UDP"
                     }
@@ -301,33 +301,25 @@ document.addEventListener('DOMContentLoaded', function () {
 
             // 添加端口
             if (normalizedData.service.ports && Array.isArray(normalizedData.service.ports)) {
-                console.log("处理数组格式的端口:", normalizedData.service.ports);
                 normalizedData.service.ports.forEach(port => {
                     addPortRow(port.name, port.port, port.protocol);
                 });
             } else if (normalizedData.service.ports && typeof normalizedData.service.ports === 'object') {
                 // 处理对象格式的端口
-                console.log("处理对象格式的端口:", normalizedData.service.ports);
-                Object.entries(normalizedData.service.ports).forEach(([name, portValue]) => {
-                    // 处理不同格式的端口配置
-                    console.log(`处理端口 ${name}:`, portValue, typeof portValue);
-                    if (typeof portValue === 'object') {
-                        // 如果是对象，尝试提取port和protocol属性
-                        const port = portValue.port || portValue;
-                        const protocol = portValue.protocol || 'TCP';
-                        console.log(`端口 ${name} 解析为:`, port, protocol);
-                        addPortRow(name, port, protocol);
+                Object.entries(normalizedData.service.ports).forEach(([name, port]) => {
+                    if (typeof port === 'object' && port !== null) {
+                        // 如果是对象，获取port和protocol属性
+                        addPortRow(name, port.port, port.protocol);
                     } else {
-                        // 如果是简单的数字，默认使用TCP协议
-                        console.log(`端口 ${name} 是简单数字:`, portValue);
-                        addPortRow(name, portValue, 'TCP');
+                        // 如果是数字，只有端口号
+                        addPortRow(name, port, 'TCP'); // 默认使用TCP协议
                     }
                 });
             }
 
             // 确保至少有一个端口
             if (document.querySelectorAll('.service-port-row').length === 0) {
-                addPortRow('http', 80);
+                addPortRow('http', 80, 'TCP');
             }
         }
 
@@ -444,10 +436,13 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // 辅助函数：添加端口行
-    function addPortRow(name, port, protocol = 'TCP') {
+    function addPortRow(name, port, protocol) {
         const portContainer = document.getElementById('service-ports-container');
         const portRow = document.createElement('div');
         portRow.className = 'service-port-row';
+
+        // 设置默认协议为TCP
+        protocol = protocol || 'TCP';
 
         portRow.innerHTML = `
             <div class="form-group port-name">
@@ -812,13 +807,7 @@ document.addEventListener('DOMContentLoaded', function () {
             },
             service: {
                 type: document.getElementById('serviceType').value,
-                ports: servicePorts.reduce((obj, port) => {
-                    obj[port.name] = {
-                        port: port.port,
-                        protocol: port.protocol
-                    };
-                    return obj;
-                }, {})
+                ports: servicePorts
             },
             networkLimits: {
                 enabled: networkEnabled,
@@ -1158,7 +1147,7 @@ document.addEventListener('DOMContentLoaded', function () {
                                         "protocol": {
                                             "type": "string",
                                             "title": "协议",
-                                            "description": "服务端口协议",
+                                            "description": "端口使用的协议",
                                             "enum": ["TCP", "UDP"],
                                             "default": "TCP"
                                         }
@@ -1177,8 +1166,8 @@ document.addEventListener('DOMContentLoaded', function () {
                                         "port": 443,
                                         "protocol": "TCP"
                                     },
-                                    "udp-service": {
-                                        "port": 9090,
+                                    "dns": {
+                                        "port": 53,
                                         "protocol": "UDP"
                                     }
                                 }
