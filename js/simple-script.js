@@ -93,8 +93,18 @@ document.addEventListener('DOMContentLoaded', function () {
             "service": {
                 "type": "ClusterIP",
                 "ports": {
-                    "http": 80,
-                    "https": 443
+                    "http": {
+                        "port": 80,
+                        "protocol": "TCP"
+                    },
+                    "https": {
+                        "port": 443,
+                        "protocol": "TCP"
+                    },
+                    "dns-udp": {
+                        "port": 53,
+                        "protocol": "UDP"
+                    }
                 }
             },
             "networkLimits": {
