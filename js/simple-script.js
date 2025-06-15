@@ -306,13 +306,15 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
             } else if (normalizedData.service.ports && typeof normalizedData.service.ports === 'object') {
                 // 处理对象格式的端口
-                Object.entries(normalizedData.service.ports).forEach(([name, port]) => {
-                    if (typeof port === 'object' && port !== null) {
+                Object.entries(normalizedData.service.ports).forEach(([name, portConfig]) => {
+                    if (typeof portConfig === 'object' && portConfig !== null) {
                         // 如果是对象，获取port和protocol属性
-                        addPortRow(name, port.port, port.protocol);
+                        const port = portConfig.port !== undefined ? portConfig.port : portConfig;
+                        const protocol = portConfig.protocol || 'TCP';
+                        addPortRow(name, port, protocol);
                     } else {
                         // 如果是数字，只有端口号
-                        addPortRow(name, port, 'TCP'); // 默认使用TCP协议
+                        addPortRow(name, portConfig, 'TCP'); // 默认使用TCP协议
                     }
                 });
             }
@@ -619,7 +621,7 @@ document.addEventListener('DOMContentLoaded', function () {
             <div class="form-group port-protocol">
                 <label>协议</label>
                 <select class="port-protocol-select">
-                    <option value="TCP">TCP</option>
+                    <option value="TCP" selected>TCP</option>
                     <option value="UDP">UDP</option>
                 </select>
             </div>
@@ -631,6 +633,10 @@ document.addEventListener('DOMContentLoaded', function () {
         // 添加删除端口的事件监听
         const removeBtn = portRow.querySelector('.remove-port');
         removeBtn.addEventListener('click', () => {
+            if (document.querySelectorAll('.service-port-row').length <= 1) {
+                alert('至少需要一个服务端口！');
+                return;
+            }
             portRow.remove();
         });
     });
@@ -991,6 +997,15 @@ document.addEventListener('DOMContentLoaded', function () {
     function generateValuesYaml() {
         const formData = getFormData();
 
+        // 创建端口对象
+        const servicePorts = {};
+        formData.service.ports.forEach(port => {
+            servicePorts[port.name] = {
+                port: port.port,
+                protocol: port.protocol
+            };
+        });
+
         const values = {
             workloadType: formData.workloadType,
             replicaCount: 1,
@@ -998,17 +1013,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 imageRegistry: formData.image.imageRegistry,
                 repository: formData.image.repository,
                 tag: formData.image.tag,
-                pullPolicy: formData.image.pullPolicy
+                pullPolicy: formData.image.pullPolicy11
             },
             service: {
                 type: formData.service.type,
-                ports: formData.service.ports.reduce((obj, port) => {
-                    obj[port.name] = {
-                        port: port.port,
-                        protocol: port.protocol
-                    };
-                    return obj;
-                }, {})
+                ports: servicePorts
             },
             networkLimits: formData.networkLimits,
             resources: {
